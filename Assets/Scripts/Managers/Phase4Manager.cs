@@ -31,8 +31,67 @@ namespace RungTramTraSu
         {
             playerCamera = Camera.main;
 
+            // Auto find player if null
+            if (player == null)
+            {
+                var controllerObj = FindAnyObjectByType<PlayerController>();
+                if (controllerObj != null) player = controllerObj.transform;
+            }
+
+            // Setup beautiful runtime environment settings (fog and lighting)
+            RenderSettings.fog = true;
+            RenderSettings.fogColor = new Color(0.55f, 0.74f, 0.68f); // Soft green-blue swamp fog
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = 0.02f; // Deeper swamp fog
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+            RenderSettings.ambientIntensity = 1.25f;
+
+            // Snap flying foliage and rocks to the organic terrain at runtime using raycasting
+            int groundLayers = LayerMask.GetMask("Default", "Terrain");
+            GameObject foliage = GameObject.Find("BeautifiedFoliage");
+            if (foliage != null)
+            {
+                foreach (Transform child in foliage.transform)
+                {
+                    Vector3 pos = child.position;
+                    RaycastHit hit;
+                    if (Physics.Raycast(new Vector3(pos.x, 20f, pos.z), Vector3.down, out hit, 40f, groundLayers))
+                    {
+                        pos.y = hit.point.y - 0.05f;
+                    }
+                    child.position = pos;
+                }
+            }
+
+            GameObject rocks = GameObject.Find("BeautifiedRocks");
+            if (rocks != null)
+            {
+                foreach (Transform child in rocks.transform)
+                {
+                    Vector3 pos = child.position;
+                    RaycastHit hit;
+                    if (Physics.Raycast(new Vector3(pos.x, 20f, pos.z), Vector3.down, out hit, 40f, groundLayers))
+                    {
+                        if (child.name.ToLower().Contains("cliff"))
+                        {
+                            pos.y = hit.point.y - 2.5f;
+                        }
+                        else
+                        {
+                            pos.y = hit.point.y - 0.3f;
+                        }
+                    }
+                    child.position = pos;
+                }
+            }
+
             // Automatically find all AnimalAI objects in the scene
             animals = new List<AnimalAI>(FindObjectsByType<AnimalAI>(FindObjectsSortMode.None));
+            Debug.Log($"[Phase4Manager] Start: Found {animals.Count} AnimalAI objects in the scene.");
+            foreach (var a in animals)
+            {
+                Debug.Log($" - Animal: {a.name}, Type: {a.Type}, Position: {a.transform.position}");
+            }
 
             // Unlock player movement
             if (player != null)
@@ -81,35 +140,20 @@ namespace RungTramTraSu
             foreach (var animal in animals)
             {
                 if (animal == null) continue;
-                if (animal.HasFled) continue; // Bỏ qua nếu con vật đã bỏ chạy trốn mất
+                if (animal.HasFled) continue;
                 if (capturedAnimals.Contains(animal.Type)) continue;
 
                 Vector3 viewportPoint = playerCamera.WorldToViewportPoint(animal.transform.position);
-                bool inFrame = viewportPoint.z > 0 && 
-                              viewportPoint.x >= 0.22f && viewportPoint.x <= 0.78f && 
-                              viewportPoint.y >= 0.22f && viewportPoint.y <= 0.78f;
+                bool inFrame = viewportPoint.z > 0 &&
+                               viewportPoint.x >= 0.15f && viewportPoint.x <= 0.85f &&
+                               viewportPoint.y >= 0.15f && viewportPoint.y <= 0.85f;
 
                 if (inFrame)
                 {
-                    // Check occlusion
-                    RaycastHit hit;
-                    Vector3 dir = animal.transform.position - playerCamera.transform.position;
-                    if (Physics.Raycast(playerCamera.transform.position, dir, out hit, dir.magnitude + 0.5f))
-                    {
-                        if (hit.transform != animal.transform && !hit.transform.IsChildOf(animal.transform))
-                        {
-                            Debug.Log("Animal is occluded by: " + hit.collider.name);
-                            continue;
-                        }
-                    }
-
                     // Set photo category dynamically based on the actual captured animal
                     if (photoCamera != null)
-                    {
                         photoCamera.SetPhotoCategory("Phase4_" + animal.Type.ToString());
-                    }
 
-                    // Photo captured successfully!
                     StartCoroutine(RegisterCapture(animal.Type));
                     return;
                 }
@@ -117,9 +161,7 @@ namespace RungTramTraSu
 
             // Reset category to General if no valid animal was captured this frame
             if (photoCamera != null)
-            {
                 photoCamera.SetPhotoCategory("General");
-            }
         }
 
         private IEnumerator RegisterCapture(AnimalAI.AnimalType type)
@@ -127,8 +169,14 @@ namespace RungTramTraSu
             capturedAnimals.Add(type);
             string animalName = GetAnimalVietnameseName(type);
             
+            // Close player diary if it is open to avoid UI overlapping with dialogue
+            if (DiaryUIController.Instance != null && DiaryUIController.Instance.IsOpen)
+            {
+                DiaryUIController.Instance.ToggleDiary();
+            }
+
             // Temporary freeze player for dialogue
-            var controller = player.GetComponent<PlayerController>();
+            var controller = player != null ? player.GetComponent<PlayerController>() : FindAnyObjectByType<PlayerController>();
             if (controller != null) controller.SetFrozen(true);
 
             string[] comment = GetGrandpaComment(type);
@@ -244,11 +292,9 @@ namespace RungTramTraSu
 
         private void UpdateObjective()
         {
-            if (objectiveText != null)
-            {
-                objectiveText.text = $"Mục tiêu: Tìm và chụp ảnh 5 loài động vật ({capturedAnimals.Count}/5).\n" +
-                                     $"Nhấn C để Crouch (cúi người) để tiếp cận chim cò không bay mất.";
-            }
+            if (objectiveText == null) return;
+            objectiveText.text = $"Mục tiêu: Chụp ảnh 5 loài động vật ({capturedAnimals.Count}/5).\n" +
+                                 "Nhấn C để Crouch tiếp cận chim cò không bay mất.";
         }
 
         public void OnPhotoQuestCompleted()

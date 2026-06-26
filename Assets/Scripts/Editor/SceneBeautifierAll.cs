@@ -67,6 +67,42 @@ namespace RungTramTraSu.Editor
             return baseHeight + noise + leftBoost;
         }
 
+        public static float GetPhase5HeightAt(float x, float z)
+        {
+            Vector2 towerPos = new Vector2(25f, 15f);
+            float distToTower = Vector2.Distance(new Vector2(x, z), towerPos);
+            
+            float baseHeight = -0.5f;
+            
+            // Add gentle noise hills further away from the tower
+            float n1 = Mathf.PerlinNoise(x * 0.06f + 500f, z * 0.06f + 500f) * 2.5f;
+            float n2 = Mathf.PerlinNoise(x * 0.15f + 600f, z * 0.15f + 600f) * 0.5f;
+            float noiseHeight = n1 + n2 - 1.2f;
+            
+            // Blend flat area near tower (12m radius)
+            float t = (distToTower - 12f) / 10f;
+            t = Mathf.Clamp01(t);
+            float smoothT = t * t * (3f - 2f * t);
+            
+            return Mathf.Lerp(baseHeight, baseHeight + noiseHeight, smoothT);
+        }
+
+        private static float GetFoliageHeight(float x, float z, string phaseName)
+        {
+            if (phaseName == "Phase4" || phaseName == "Phase3" || phaseName == "Phase2")
+            {
+                return GetHeightAt(x, z);
+            }
+            else if (phaseName == "Phase5")
+            {
+                return GetPhase5HeightAt(x, z);
+            }
+            else
+            {
+                return GetHeightAt(x, z);
+            }
+        }
+
         public static void BeautifyPhase2()
         {
             Scene activeScene = SceneManager.GetActiveScene();
@@ -81,7 +117,10 @@ namespace RungTramTraSu.Editor
             // 3. Populate foliage, rocks, cliffs, spruce trees
             PopulateFoliageAndRocks("Phase2");
 
-            // 4. Setup skybox & fog
+            // 4. Upgrade primitive ducks/storks/fish
+            UpgradeFauna();
+
+            // 5. Setup skybox & fog
             ApplySkybox("Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
             RenderSettings.ambientIntensity = 1.25f;
@@ -90,7 +129,7 @@ namespace RungTramTraSu.Editor
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.015f;
 
-            // 5. Save scene
+            // 6. Save scene
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
             AssetDatabase.SaveAssets();
@@ -161,12 +200,7 @@ namespace RungTramTraSu.Editor
 
             // 5. Setup skybox & fog
             ApplySkybox("Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = 1.25f;
-            RenderSettings.fog = true;
-            RenderSettings.fogColor = new Color(0.6f, 0.78f, 0.72f);
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.015f;
+            SetupPhase4VolumeAndAtmosphere();
 
             // 6. Save scene
             EditorSceneManager.MarkSceneDirty(activeScene);
@@ -344,6 +378,81 @@ namespace RungTramTraSu.Editor
             volume.sharedProfile = profile;
         }
 
+        private static void SetupPhase4VolumeAndAtmosphere()
+        {
+            // 1. Setup beautiful misty swamp fog
+            RenderSettings.fog = true;
+            RenderSettings.fogColor = new Color(0.55f, 0.74f, 0.68f); // Soft green-blue swamp fog
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = 0.02f; // Deeper swamp fog
+
+            // 2. Setup soft warm directional light
+            GameObject dirLight = GameObject.Find("Directional Light");
+            if (dirLight != null)
+            {
+                dirLight.transform.rotation = Quaternion.Euler(30f, -55f, 0f);
+                Light light = dirLight.GetComponent<Light>();
+                if (light != null)
+                {
+                    light.color = new Color(0.95f, 0.98f, 0.92f); // Warm soft morning/afternoon sun
+                    light.intensity = 1.25f;
+                    light.shadows = LightShadows.Soft;
+                }
+            }
+
+            // 3. Setup ambient light
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+            RenderSettings.ambientIntensity = 1.25f;
+            DynamicGI.UpdateEnvironment();
+
+            // 4. Create or load Phase 4 Volume Profile
+            GameObject volumeObj = GameObject.Find("Global PostProcess Volume");
+            if (volumeObj == null)
+            {
+                volumeObj = new GameObject("Global PostProcess Volume");
+            }
+            Volume volume = volumeObj.GetComponent<Volume>();
+            if (volume == null)
+            {
+                volume = volumeObj.AddComponent<Volume>();
+            }
+            volume.isGlobal = true;
+
+            string profilePath = "Assets/Scenes/Phase4_VolumeProfile.asset";
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+
+                var tonemapping = profile.Add<Tonemapping>();
+                tonemapping.active = true;
+                tonemapping.mode.Override(TonemappingMode.ACES);
+
+                var bloom = profile.Add<Bloom>();
+                bloom.active = true;
+                bloom.threshold.Override(0.78f);
+                bloom.intensity.Override(2.2f);
+                bloom.scatter.Override(0.72f);
+                bloom.tint.Override(new Color(1f, 0.94f, 0.80f));
+
+                var colorAdjust = profile.Add<ColorAdjustments>();
+                colorAdjust.active = true;
+                colorAdjust.contrast.Override(25f);
+                colorAdjust.saturation.Override(32f);
+                colorAdjust.postExposure.Override(0.12f);
+
+                var vignette = profile.Add<Vignette>();
+                vignette.active = true;
+                vignette.intensity.Override(0.28f);
+                vignette.smoothness.Override(0.4f);
+                vignette.rounded.Override(true);
+
+                AssetDatabase.CreateAsset(profile, profilePath);
+                AssetDatabase.SaveAssets();
+            }
+            volume.sharedProfile = profile;
+        }
+
         private static void PopulateFoliageAndRocks(string phaseName)
         {
             GameObject foliageContainer = new GameObject("BeautifiedFoliage");
@@ -386,7 +495,7 @@ namespace RungTramTraSu.Editor
             {
                 float x = Random.Range(-55f, 55f);
                 float z = Random.Range(-65f, 65f);
-                float y = GetHeightAt(x, z);
+                float y = GetFoliageHeight(x, z, phaseName);
 
                 if (IsPositionExcluded(x, z, phaseName)) continue;
 
@@ -421,7 +530,7 @@ namespace RungTramTraSu.Editor
             {
                 float x = Random.Range(-55f, 55f);
                 float z = Random.Range(-65f, 65f);
-                float y = GetHeightAt(x, z);
+                float y = GetFoliageHeight(x, z, phaseName);
 
                 if (IsPositionExcluded(x, z, phaseName)) continue;
 
@@ -439,7 +548,7 @@ namespace RungTramTraSu.Editor
             {
                 float x = Random.Range(-55f, 55f);
                 float z = Random.Range(-65f, 65f);
-                float y = GetHeightAt(x, z);
+                float y = GetFoliageHeight(x, z, phaseName);
 
                 if (IsPositionExcluded(x, z, phaseName)) continue;
 
@@ -491,6 +600,10 @@ namespace RungTramTraSu.Editor
             {
                 // Grandpa NPC zone
                 if (Vector2.Distance(new Vector2(x, z), new Vector2(22.0f, -46f)) < 8f) return true;
+
+                // Clear the canal pathway so it is free of rocks, cliffs, and decorative trees/foliage
+                float canalCenter = 25f + Mathf.Sin(z * 0.08f) * 5f;
+                if (Mathf.Abs(x - canalCenter) < 5.0f) return true;
             }
             else if (phaseName == "Phase5")
             {
@@ -501,20 +614,141 @@ namespace RungTramTraSu.Editor
             return false;
         }
 
+        /// <summary>
+        /// Procedurally generates a low-poly tapered-cylinder fish body mesh and saves it
+        /// to Assets/Models/Generated/ProceduralFishMesh.asset so it can be reused at runtime.
+        /// This is inlined here to avoid a cross-file dependency on ProceduralFishGenerator.
+        /// </summary>
+        private static void EnsureProceduralFishMesh()
+        {
+            string path = "Assets/Models/Generated/ProceduralFishMesh.asset";
+
+            // Return early if the asset is already up-to-date in the database
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(path) != null) return;
+
+            Mesh mesh = new Mesh();
+            mesh.name = "ProceduralFishBody";
+
+            int segments = 10;
+            int radialSegments = 8;
+            float length = 0.7f;
+            float maxRadius = 0.12f;
+            float widthScale = 0.5f;
+            float heightScale = 1.3f;
+
+            int numVertices = (segments + 1) * (radialSegments + 1);
+            Vector3[] vertices = new Vector3[numVertices];
+            Vector2[] uvs = new Vector2[numVertices];
+
+            int v = 0;
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = (float)i / segments;
+                float r = Mathf.Sin(t * Mathf.PI) * maxRadius;
+                if (i == 0) r = maxRadius * 0.25f;
+                else if (i == segments) r = maxRadius * 0.1f;
+                float z = (t - 0.5f) * length;
+
+                for (int j = 0; j <= radialSegments; j++)
+                {
+                    float radPct = (float)j / radialSegments;
+                    float angle = radPct * Mathf.PI * 2f;
+                    float x = Mathf.Cos(angle) * r * widthScale;
+                    float y = Mathf.Sin(angle) * r * heightScale;
+                    vertices[v] = new Vector3(x, y, -z);
+                    uvs[v] = new Vector2(radPct, t);
+                    v++;
+                }
+            }
+
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+
+            var tris = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < segments; i++)
+            {
+                int r1 = i * (radialSegments + 1);
+                int r2 = (i + 1) * (radialSegments + 1);
+                for (int j = 0; j < radialSegments; j++)
+                {
+                    int nextJ = j + 1;
+                    tris.Add(r1 + j); tris.Add(r2 + j); tris.Add(r1 + nextJ);
+                    tris.Add(r1 + nextJ); tris.Add(r2 + j); tris.Add(r2 + nextJ);
+                }
+            }
+
+            mesh.triangles = tris.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            if (!System.IO.Directory.Exists("Assets/Models/Generated"))
+                System.IO.Directory.CreateDirectory("Assets/Models/Generated");
+
+            // Delete stale asset first so CreateAsset doesn't throw
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(path) != null)
+                AssetDatabase.DeleteAsset(path);
+
+            AssetDatabase.CreateAsset(mesh, path);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("==> ProceduralFishMesh generated and saved to: " + path);
+        }
+
         private static void UpgradeFauna()
         {
             GameObject duckPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Vịt/source/Snowy White Duck.glb");
             if (duckPrefab == null)
             {
-                Debug.LogWarning("Snowy White Duck.glb not found!");
-                return;
+                string[] guids = AssetDatabase.FindAssets("Snowy White Duck t:GameObject");
+                if (guids.Length > 0)
+                {
+                    duckPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                }
+            }
+
+            GameObject storkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/living birds/resources/lb_crowHQ.prefab");
+            if (storkPrefab == null)
+            {
+                string[] guids = AssetDatabase.FindAssets("lb_crowHQ t:GameObject");
+                if (guids.Length > 0)
+                {
+                    storkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                }
+            }
+            if (storkPrefab == null)
+            {
+                storkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/living birds/resources/lb_sparrowHQ.prefab");
+                if (storkPrefab == null)
+                {
+                    string[] guids = AssetDatabase.FindAssets("lb_sparrowHQ t:GameObject");
+                    if (guids.Length > 0)
+                    {
+                        storkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                    }
+                }
             }
 
             // Find all AnimalAI components in the active scene
             AnimalAI[] animals = Object.FindObjectsByType<AnimalAI>(FindObjectsInactive.Exclude);
+            Debug.Log($"[UpgradeFauna] Found {animals.Length} AnimalAI objects in scene.");
+
             foreach (var ai in animals)
             {
-                if (ai.Type == AnimalAI.AnimalType.Duck || ai.Type == AnimalAI.AnimalType.Stork)
+                // Remove any previous visual children to allow clean regeneration
+                for (int i = ai.transform.childCount - 1; i >= 0; i--)
+                {
+                    var child = ai.transform.GetChild(i);
+                    if (child.name.StartsWith("Visual") || child.name == "VisualModel" || child.name == "FishBody" || child.name == "LWingPivot" || child.name == "RWingPivot")
+                    {
+                        Object.DestroyImmediate(child.gameObject);
+                    }
+                }
+
+                // Always reset the root scale so the primitive's distorted scale
+                // (e.g. 0.5 x 0.3 x 0.8) doesn't deform the 3D replacement model.
+                ai.transform.localScale = Vector3.one;
+
+                if (ai.Type == AnimalAI.AnimalType.Duck && duckPrefab != null)
                 {
                     // Destroy the primitive renderer and filter
                     MeshRenderer mr = ai.GetComponent<MeshRenderer>();
@@ -528,19 +762,222 @@ namespace RungTramTraSu.Editor
                     {
                         model.name = "VisualModel";
                         model.transform.SetParent(ai.transform, false);
-                        
-                        if (ai.Type == AnimalAI.AnimalType.Duck)
+                        model.transform.localScale = Vector3.one * 0.28f;
+                        model.transform.localPosition = new Vector3(0f, -0.1f, 0f);
+                    }
+                }
+                else if (ai.Type == AnimalAI.AnimalType.Stork && storkPrefab != null)
+                {
+                    // Destroy the primitive renderer and filter
+                    MeshRenderer mr = ai.GetComponent<MeshRenderer>();
+                    if (mr != null) Object.DestroyImmediate(mr);
+                    MeshFilter mf = ai.GetComponent<MeshFilter>();
+                    if (mf != null) Object.DestroyImmediate(mf);
+
+                    // Instantiate the model as child
+                    GameObject model = PrefabUtility.InstantiatePrefab(storkPrefab) as GameObject;
+                    if (model != null)
+                    {
+                        model.name = "VisualModel";
+                        model.transform.SetParent(ai.transform, false);
+                        model.transform.localScale = Vector3.one * 2.2f; // Scale up to 2.2x to be clearly visible from below!
+                        model.transform.localPosition = new Vector3(0f, -0.15f, 0f);
+                        model.transform.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+                        // Disable and destroy all scripts on the instantiated model (like lb_Bird, lb_CrowProximity, etc.)
+                        var behaviours = model.GetComponentsInChildren<MonoBehaviour>(true);
+                        foreach (var b in behaviours)
                         {
-                            model.transform.localScale = Vector3.one * 0.28f;
-                            model.transform.localPosition = new Vector3(0f, -0.1f, 0f);
+                            if (b != null) Object.DestroyImmediate(b);
                         }
-                        else // Stork
+
+                        // Force animator to loop perched state
+                        var anim = model.GetComponent<Animator>();
+                        if (anim != null)
                         {
-                            model.transform.localScale = Vector3.one * 0.25f;
-                            model.transform.localPosition = new Vector3(0f, -0.15f, 0f);
-                            model.transform.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+                            anim.SetBool("flying", false);
+                            anim.Play("perch");
+                        }
+
+                        // Apply pure white material to make it look like a white stork
+                        Material whiteMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                        whiteMat.color = Color.white;
+                        if (whiteMat.HasProperty("_Smoothness")) whiteMat.SetFloat("_Smoothness", 0.1f);
+                        
+                        var renderers = model.GetComponentsInChildren<Renderer>(true);
+                        foreach (var r in renderers)
+                        {
+                            r.sharedMaterial = whiteMat;
                         }
                     }
+                }
+                else if (ai.Type == AnimalAI.AnimalType.Snake)
+                {
+                    // Destroy the primitive renderer and filter
+                    MeshRenderer mr = ai.GetComponent<MeshRenderer>();
+                    if (mr != null) Object.DestroyImmediate(mr);
+                    MeshFilter mf = ai.GetComponent<MeshFilter>();
+                    if (mf != null) Object.DestroyImmediate(mf);
+
+                    // Create a procedural snake container
+                    GameObject visualSnake = new GameObject("VisualSnake");
+                    visualSnake.transform.SetParent(ai.transform, false);
+
+                    Material snakeMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    snakeMat.color = new Color(0.12f, 0.42f, 0.16f); // Glossy green snake skin
+                    if (snakeMat.HasProperty("_Smoothness")) snakeMat.SetFloat("_Smoothness", 0.65f);
+
+                    int segmentCount = 6;
+                    for (int i = 0; i < segmentCount; i++)
+                    {
+                        GameObject seg = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                        seg.name = "SnakeSegment_" + i;
+                        seg.transform.SetParent(visualSnake.transform, false);
+                        float size = Mathf.Lerp(0.28f, 0.12f, (float)i / (segmentCount - 1));
+                        seg.transform.localScale = new Vector3(size, size, size);
+                        seg.transform.localPosition = new Vector3(-i * 0.22f, 0f, 0f);
+                        seg.GetComponent<Renderer>().sharedMaterial = snakeMat;
+                        Object.DestroyImmediate(seg.GetComponent<Collider>());
+                    }
+                }
+                else if (ai.Type == AnimalAI.AnimalType.Fish)
+                {
+                    // Destroy the primitive renderer and filter
+                    MeshRenderer mr = ai.GetComponent<MeshRenderer>();
+                    if (mr != null) Object.DestroyImmediate(mr);
+                    MeshFilter mf = ai.GetComponent<MeshFilter>();
+                    if (mf != null) Object.DestroyImmediate(mf);
+
+                    // Ensure the procedural 3D fish mesh is generated (inline so no cross-file dep)
+                    EnsureProceduralFishMesh();
+
+                    // Create 3D fish container
+                    GameObject visualFish = new GameObject("VisualFish");
+                    visualFish.transform.SetParent(ai.transform, false);
+
+                    // Create body GameObject
+                    GameObject body = new GameObject("FishBody");
+                    body.transform.SetParent(visualFish.transform, false);
+                    body.transform.localScale = Vector3.one;
+                    body.transform.localRotation = Quaternion.identity; // face forward (+Z)
+
+                    // Mesh filter and renderer
+                    MeshFilter filter = body.AddComponent<MeshFilter>();
+                    Mesh proceduralMesh = AssetDatabase.LoadAssetAtPath<Mesh>("Assets/Models/Generated/ProceduralFishMesh.asset");
+                    if (proceduralMesh != null)
+                    {
+                        filter.sharedMesh = proceduralMesh;
+                    }
+                    else
+                    {
+                        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                        filter.sharedMesh = sphere.GetComponent<MeshFilter>().sharedMesh;
+                        Object.DestroyImmediate(sphere);
+                    }
+
+                    MeshRenderer renderer = body.AddComponent<MeshRenderer>();
+
+                    // Load generated fish texture — use Alpha Cutout so transparent edges are clipped
+                    Texture2D fishTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/fish_sprite.png");
+                    Material fishMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    if (fishTex != null)
+                    {
+                        fishMat.mainTexture = fishTex;
+                        // Enable Alpha Clipping so the transparent background of the sprite is cut out
+                        fishMat.SetFloat("_AlphaClip", 1f);
+                        fishMat.SetFloat("_Cutoff", 0.25f);
+                        fishMat.EnableKeyword("_ALPHATEST_ON");
+                        fishMat.SetOverrideTag("RenderType", "TransparentCutout");
+                        fishMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+                        // Double-sided so the body is visible from all angles
+                        fishMat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+                        if (fishMat.HasProperty("_Smoothness")) fishMat.SetFloat("_Smoothness", 0.55f);
+                    }
+                    else
+                    {
+                        fishMat.color = new Color(0.25f, 0.55f, 0.45f); // Fallback teal-green
+                        fishMat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+                    }
+                    renderer.sharedMaterial = fishMat;
+
+                    // Spawn tail fin pivot (for wagging animation to rotate around 0 local Y)
+                    GameObject tailPivot = new GameObject("FishTail");
+                    tailPivot.transform.SetParent(body.transform, false);
+                    tailPivot.transform.localPosition = new Vector3(0f, 0f, -0.38f); // at the tail end
+                    tailPivot.transform.localRotation = Quaternion.identity;
+
+                    // Spawn tail Quad visual as child of the pivot
+                    GameObject tailVisual = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    tailVisual.name = "TailVisual";
+                    tailVisual.transform.SetParent(tailPivot.transform, false);
+                    tailVisual.transform.localPosition = Vector3.zero;
+                    tailVisual.transform.localScale = new Vector3(0.38f, 0.38f, 1f);
+                    tailVisual.transform.localRotation = Quaternion.Euler(0f, 90f, 0f); // Face sideways
+
+                    // Fin material — double-sided so it shows from both sides
+                    Material finMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    finMat.color = new Color(0.18f, 0.55f, 0.45f); // Teal-green matching fish body
+                    finMat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+                    tailVisual.GetComponent<Renderer>().sharedMaterial = finMat;
+                    Object.DestroyImmediate(tailVisual.GetComponent<Collider>());
+                }
+                else if (ai.Type == AnimalAI.AnimalType.Butterfly)
+                {
+                    // Destroy the primitive renderer and filter
+                    MeshRenderer mr = ai.GetComponent<MeshRenderer>();
+                    if (mr != null) Object.DestroyImmediate(mr);
+                    MeshFilter mf = ai.GetComponent<MeshFilter>();
+                    if (mf != null) Object.DestroyImmediate(mf);
+
+                    // Create procedural butterfly
+                    GameObject visualButterfly = new GameObject("VisualButterfly");
+                    visualButterfly.transform.SetParent(ai.transform, false);
+
+                    Material bodyMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    bodyMat.color = new Color(0.2f, 0.1f, 0.25f);
+
+                    Material wingMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    wingMat.color = new Color(0.95f, 0.35f, 0.72f); // Vivid pink wings
+                    // Double-sided so wings show from both faces during flap
+                    wingMat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+                    if (wingMat.HasProperty("_Smoothness")) wingMat.SetFloat("_Smoothness", 0.5f);
+
+                    // Body
+                    GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    body.name = "ButterflyBody";
+                    body.transform.SetParent(visualButterfly.transform, false);
+                    body.transform.localScale = new Vector3(0.04f, 0.15f, 0.04f);
+                    body.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    body.GetComponent<Renderer>().sharedMaterial = bodyMat;
+                    Object.DestroyImmediate(body.GetComponent<Collider>());
+
+                    // Left wing
+                    GameObject lWingPivot = new GameObject("LWingPivot");
+                    lWingPivot.transform.SetParent(visualButterfly.transform, false);
+                    lWingPivot.transform.localPosition = new Vector3(-0.02f, 0f, 0f);
+
+                    GameObject lWing = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    lWing.name = "LeftWing";
+                    lWing.transform.SetParent(lWingPivot.transform, false);
+                    lWing.transform.localPosition = new Vector3(-0.15f, 0f, 0f);
+                    lWing.transform.localScale = new Vector3(0.3f, 0.25f, 1f);
+                    lWing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    lWing.GetComponent<Renderer>().sharedMaterial = wingMat;
+                    Object.DestroyImmediate(lWing.GetComponent<Collider>());
+
+                    // Right wing
+                    GameObject rWingPivot = new GameObject("RWingPivot");
+                    rWingPivot.transform.SetParent(visualButterfly.transform, false);
+                    rWingPivot.transform.localPosition = new Vector3(0.02f, 0f, 0f);
+
+                    GameObject rWing = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    rWing.name = "RightWing";
+                    rWing.transform.SetParent(rWingPivot.transform, false);
+                    rWing.transform.localPosition = new Vector3(0.15f, 0f, 0f);
+                    rWing.transform.localScale = new Vector3(0.3f, 0.25f, 1f);
+                    rWing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    rWing.GetComponent<Renderer>().sharedMaterial = wingMat;
+                    Object.DestroyImmediate(rWing.GetComponent<Collider>());
                 }
             }
         }

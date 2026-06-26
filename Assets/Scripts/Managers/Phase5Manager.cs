@@ -8,7 +8,14 @@ namespace RungTramTraSu
 {
     public class Phase5Manager : MonoBehaviour
     {
+        public static void SetInstance(Phase5Manager manager)
+        {
+            Instance = manager;
+        }
+
         public static Phase5Manager Instance { get; private set; }
+
+        public bool IsEndingActive => dialogueTriggered;
 
         [Header("References")]
         [SerializeField] private Transform player;
@@ -46,6 +53,20 @@ namespace RungTramTraSu
         {
             if (diaryCanvas != null) diaryCanvas.SetActive(false);
 
+            // Auto find player if null
+            if (player == null)
+            {
+                var controllerObj = FindAnyObjectByType<PlayerController>();
+                if (controllerObj != null) player = controllerObj.transform;
+            }
+
+            // Auto find grandpa if null
+            if (grandpa == null)
+            {
+                var grandpaObj = FindAnyObjectByType<NPCGrandpa>();
+                if (grandpaObj != null) grandpa = grandpaObj.transform;
+            }
+
             if (player != null)
             {
                 startHeight = player.position.y;
@@ -55,6 +76,49 @@ namespace RungTramTraSu
 
             // Set topHeight matching the new deck surface height
             topHeight = 10.75f;
+
+            // Setup beautiful runtime fog settings
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+
+            // Snap flying foliage and rocks to the organic terrain at runtime using raycasting
+            int groundLayers = LayerMask.GetMask("Default", "Terrain");
+            GameObject foliage = GameObject.Find("BeautifiedFoliage");
+            if (foliage != null)
+            {
+                foreach (Transform child in foliage.transform)
+                {
+                    Vector3 pos = child.position;
+                    RaycastHit hit;
+                    if (Physics.Raycast(new Vector3(pos.x, 20f, pos.z), Vector3.down, out hit, 40f, groundLayers))
+                    {
+                        pos.y = hit.point.y - 0.05f;
+                    }
+                    child.position = pos;
+                }
+            }
+
+            GameObject rocks = GameObject.Find("BeautifiedRocks");
+            if (rocks != null)
+            {
+                foreach (Transform child in rocks.transform)
+                {
+                    Vector3 pos = child.position;
+                    RaycastHit hit;
+                    if (Physics.Raycast(new Vector3(pos.x, 20f, pos.z), Vector3.down, out hit, 40f, groundLayers))
+                    {
+                        if (child.name.ToLower().Contains("cliff"))
+                        {
+                            pos.y = hit.point.y - 2.5f;
+                        }
+                        else
+                        {
+                            pos.y = hit.point.y - 0.3f;
+                        }
+                    }
+                    child.position = pos;
+                }
+            }
 
             // Instantiate a copy of the skybox material so we don't modify the asset on disk
             if (RenderSettings.skybox != null)
@@ -85,7 +149,7 @@ namespace RungTramTraSu
             ApplySunsetLighting(progress);
 
             // Trigger climax dialogue when player gets close to the top and grandpa
-            if (!dialogueTriggered && currentY >= topHeight - 1.5f && Vector3.Distance(player.position, grandpa.position) < 5.0f)
+            if (!dialogueTriggered && currentY >= topHeight - 1.5f && grandpa != null && Vector3.Distance(player.position, grandpa.position) < 5.0f)
             {
                 dialogueTriggered = true;
                 StartCoroutine(SunsetClimaxRoutine());
@@ -117,7 +181,13 @@ namespace RungTramTraSu
 
         private IEnumerator SunsetClimaxRoutine()
         {
-            var controller = player.GetComponent<PlayerController>();
+            // Close player diary if it is open to avoid UI overlapping with dialogue
+            if (DiaryUIController.Instance != null && DiaryUIController.Instance.IsOpen)
+            {
+                DiaryUIController.Instance.ToggleDiary();
+            }
+
+            var controller = player != null ? player.GetComponent<PlayerController>() : FindAnyObjectByType<PlayerController>();
             if (controller != null) controller.SetFrozen(true);
 
             string[] climax = new string[] {
@@ -156,10 +226,14 @@ namespace RungTramTraSu
         {
             yield return new WaitForSeconds(1.5f);
 
-            var controller = player.GetComponent<PlayerController>();
-            if (controller != null) controller.SetFrozen(true);
+            // Freeze player if present
+            if (player != null)
+            {
+                var controller = player.GetComponent<PlayerController>();
+                if (controller != null) controller.SetFrozen(true);
+            }
 
-            // Fade to black
+            // Fade to black (wait 2s regardless so the transition feels smooth)
             if (ScreenFader.Instance != null)
             {
                 float elapsed = 0f;
@@ -169,9 +243,23 @@ namespace RungTramTraSu
                     yield return null;
                 }
             }
+            else
+            {
+                yield return new WaitForSeconds(2.0f);
+            }
 
             // Open Diary UI
             OpenDiaryUI();
+
+            // --- Fallback: if diaryCanvas is not assigned in Inspector, show a simple message ---
+            if (diaryCanvas == null)
+            {
+                UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                yield return new WaitForSeconds(5f);
+                SceneManager.LoadScene("Phase1_GrandpaHouse");
+            }
         }
 
         private void OpenDiaryUI()
@@ -187,38 +275,41 @@ namespace RungTramTraSu
                 // Populate photos
                 if (PersistentGameManager.Instance != null && polaroidImages != null)
                 {
-                    string[] categories = new string[] {
-                        "Phase2_Ch1",
-                        "Phase2_Ch2",
-                        "Phase2_Ch3",
-                        "", // Sẽ tìm động vật Phase 4 ở dưới
-                        "Phase5_Sunset"
-                    };
-
                     for (int i = 0; i < polaroidImages.Length; i++)
                     {
-                        if (i == 3)
+                        Texture2D tex = null;
+                        if (i == 0)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
+                        }
+                        else if (i == 1)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                        }
+                        else if (i == 2)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                        }
+                        else if (i == 3)
                         {
                             // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
-                            Texture2D animalTex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
-                            if (animalTex == null) animalTex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
-                            if (animalTex == null) animalTex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
-                            if (animalTex == null) animalTex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
-                            if (animalTex == null) animalTex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
-
-                            if (animalTex != null)
-                            {
-                                polaroidImages[i].texture = animalTex;
-                                polaroidImages[i].color = Color.white;
-                            }
-                            else
-                            {
-                                polaroidImages[i].color = Color.gray;
-                            }
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
                         }
-                        else
+                        else if (i == 4)
                         {
-                            Texture2D tex = PersistentGameManager.Instance.GetPhoto(categories[i]);
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
+                        }
+
+                        if (polaroidImages[i] != null)
+                        {
                             if (tex != null)
                             {
                                 polaroidImages[i].texture = tex;
@@ -226,6 +317,7 @@ namespace RungTramTraSu
                             }
                             else
                             {
+                                polaroidImages[i].texture = null;
                                 polaroidImages[i].color = Color.gray;
                             }
                         }
