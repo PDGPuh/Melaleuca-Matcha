@@ -112,8 +112,9 @@ namespace RungTramTraSu
             // Start in idle state
             SetAnimation(false, false);
 
-            // Tự động đưa Ông Ngoại lên thuyền nếu đang ở cảnh Phase 2
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Phase2_Canal")
+            // Tự động đưa Ông Ngoại lên thuyền nếu đang ở cảnh Phase 2 hoặc Phase 3
+            string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (sceneName == "Phase2_Canal" || sceneName == "Phase3_BambooBridge")
             {
                 GameObject boatObj = GameObject.Find("Sampan Boat");
                 if (boatObj != null)
