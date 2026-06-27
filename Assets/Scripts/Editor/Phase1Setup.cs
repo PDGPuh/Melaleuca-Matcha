@@ -480,6 +480,37 @@ namespace RungTramTraSu
                 reed.GetComponent<Renderer>().sharedMaterial = reedMat;
             }
 
+            // Spawn ambient jumping fish along the canal in Phase 2!
+            GameObject fishContainer = new GameObject("AmbientFish");
+            for (int i = 0; i < 8; i++)
+            {
+                float zPos = -40f + i * 11.5f;
+                float canalCenter = 25f + Mathf.Sin(zPos * 0.08f) * 5f;
+                float xPos = canalCenter + Random.Range(-1.5f, 1.5f);
+                float yPos = -1.5f; // Swim below water surface (-1.0f)
+
+                GameObject fishObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                fishObj.name = "JumpingFish_P2_" + i;
+                fishObj.transform.SetParent(fishContainer.transform);
+                fishObj.transform.position = new Vector3(xPos, yPos, zPos);
+                fishObj.transform.localScale = new Vector3(0.15f, 0.6f, 0.15f);
+
+                Material animMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                animMat.color = new Color(0.18f, 0.22f, 0.42f);
+                fishObj.GetComponent<Renderer>().sharedMaterial = animMat;
+
+                var sCol = fishObj.AddComponent<SphereCollider>();
+                sCol.isTrigger = true;
+                sCol.radius = 1.2f;
+
+                var ai = fishObj.AddComponent<AnimalAI>();
+                var serAI = new SerializedObject(ai);
+                serAI.FindProperty("animalType").intValue = (int)AnimalAI.AnimalType.Fish;
+                serAI.FindProperty("speed").floatValue = 0f;
+                serAI.FindProperty("range").floatValue = 0f;
+                serAI.ApplyModifiedProperties();
+            }
+
             // Event targets
             GameObject sunRayObj = new GameObject("SunRayQuestTarget");
             sunRayObj.transform.position = new Vector3(23f, 4f, -10f);
@@ -580,6 +611,34 @@ namespace RungTramTraSu
             serPhase2.FindProperty("sunRayTarget").objectReferenceValue = sunRayObj.transform;
             serPhase2.FindProperty("storkTarget").objectReferenceValue = storkLeader.transform;
             serPhase2.FindProperty("storksFlock").objectReferenceValue = flock;
+
+            // Load and assign bird prefabs directly so checkpoint 1/2/3 works seamlessly
+            List<GameObject> birds = new List<GameObject>();
+            string[] birdNames = new string[] { "lb_robinHQ", "lb_sparrowHQ", "lb_goldFinchHQ", "lb_blueJayHQ", "lb_cardinalHQ" };
+            foreach (var bName in birdNames)
+            {
+                GameObject birdPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/living birds/resources/{bName}.prefab");
+                if (birdPrefab == null)
+                {
+                    string[] guids = AssetDatabase.FindAssets($"{bName} t:GameObject");
+                    if (guids.Length > 0)
+                    {
+                        birdPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                    }
+                }
+                if (birdPrefab != null)
+                {
+                    birds.Add(birdPrefab);
+                }
+            }
+            var birdPrefabsProp = serPhase2.FindProperty("birdPrefabs");
+            birdPrefabsProp.ClearArray();
+            for (int i = 0; i < birds.Count; i++)
+            {
+                birdPrefabsProp.InsertArrayElementAtIndex(i);
+                birdPrefabsProp.GetArrayElementAtIndex(i).objectReferenceValue = birds[i];
+            }
+
             serPhase2.ApplyModifiedProperties();
 
             SetupPostProcessingAndFog(camObj);
@@ -914,20 +973,71 @@ namespace RungTramTraSu
             else waterMat.color = new Color(0.06f, 0.18f, 0.14f);
             if (waterMat.HasProperty("_Smoothness")) waterMat.SetFloat("_Smoothness", 0.75f);
 
-            GameObject swampFloor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            swampFloor.name = "SwampFloor_Ground";
-            swampFloor.transform.position = new Vector3(20f, -1.8f, 0f);
-            swampFloor.transform.localScale = new Vector3(10f, 1f, 12f);
+            // A. Grid terrain (same beautiful organic bank as Phase 2!)
+            GameObject terrainObj = new GameObject("OrganicTerrain_Bank");
+            MeshFilter meshFilter = terrainObj.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = terrainObj.AddComponent<MeshRenderer>();
+            MeshCollider meshCollider = terrainObj.AddComponent<MeshCollider>();
 
+            Mesh terrainMesh = new Mesh();
+            int xSegments = 120;
+            int zSegments = 120;
+            int numVertices = (xSegments + 1) * (zSegments + 1);
+            Vector3[] vertices = new Vector3[numVertices];
+            Vector2[] uvs = new Vector2[numVertices];
+            int[] triangles = new int[xSegments * zSegments * 6];
+
+            float xMin = -55f, xMax = 55f, zMin = -65f, zMax = 65f;
+            int vIndex = 0;
+            for (int z = 0; z <= zSegments; z++)
+            {
+                float zPct = (float)z / zSegments;
+                float zPos = Mathf.Lerp(zMin, zMax, zPct);
+                for (int x = 0; x <= xSegments; x++)
+                {
+                    float xPct = (float)x / xSegments;
+                    float xPos = Mathf.Lerp(xMin, xMax, xPct);
+                    float yPos = GetHeightAt(xPos, zPos);
+                    vertices[vIndex] = new Vector3(xPos, yPos, zPos);
+                    uvs[vIndex] = new Vector2(xPos * 0.12f, zPos * 0.12f);
+                    vIndex++;
+                }
+            }
+
+            int tIndex = 0;
+            for (int z = 0; z < zSegments; z++)
+            {
+                for (int x = 0; x < xSegments; x++)
+                {
+                    int row1 = z * (xSegments + 1);
+                    int row2 = (z + 1) * (xSegments + 1);
+                    triangles[tIndex++] = row1 + x;
+                    triangles[tIndex++] = row2 + x;
+                    triangles[tIndex++] = row1 + x + 1;
+                    triangles[tIndex++] = row1 + x + 1;
+                    triangles[tIndex++] = row2 + x;
+                    triangles[tIndex++] = row2 + x + 1;
+                }
+            }
+            terrainMesh.vertices = vertices;
+            terrainMesh.uv = uvs;
+            terrainMesh.triangles = triangles;
+            terrainMesh.RecalculateNormals();
+            meshFilter.sharedMesh = terrainMesh;
+            meshCollider.sharedMesh = terrainMesh;
+            meshRenderer.sharedMaterial = grassMat;
+
+            // B. Canal water (same beautiful river as Phase 2!)
             GameObject water = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            water.name = "SwampWater";
-            water.transform.position = new Vector3(20f, -1.0f, 0f);
-            water.transform.localScale = new Vector3(10f, 1f, 12f);
+            water.name = "RiverWater_Canal";
+            water.transform.position = new Vector3(25f, -1.0f, 0f);
+            water.transform.localScale = new Vector3(4.5f, 1f, 15f);
             DestroyImmediate(water.GetComponent<MeshCollider>());
             water.GetComponent<Renderer>().sharedMaterial = waterMat;
 
             // Biển báo gỗ mộc mạc tại khu bảo tồn
-            CreateScenicWoodenSign("Khu Bảo Tồn Đầm Lầy\n(Yêu Cầu Đi Nhẹ Nói Khẽ)", new Vector3(22f, -0.8f, -46f), 10f);
+            float signY = GetHeightAt(22f, -46f);
+            CreateScenicWoodenSign("Khu Bảo Tồn Đầm Lầy\n(Yêu Cầu Đi Nhẹ Nói Khẽ)", new Vector3(22f, signY, -46f), 10f);
 
             // Spawning 150 cajuput trees (dense sanctuary forest!)
             Random.InitState(777);
@@ -936,9 +1046,13 @@ namespace RungTramTraSu
             {
                 float xPos = Random.Range(-25f, 65f);
                 float zPos = Random.Range(-55f, 55f);
-                if (xPos > 12f && xPos < 28f && zPos > -45f && zPos < 45f && Random.value > 0.3f)
+                
+                // Exclude trees from spawning inside the organic canal pathway
+                float canalCenter = 25f + Mathf.Sin(zPos * 0.08f) * 5f;
+                if (Mathf.Abs(xPos - canalCenter) < 5.5f)
                 {
-                    xPos += (Random.value > 0.5f) ? 16f : -16f;
+                    // Push the tree to the left or right bank
+                    xPos += (xPos > canalCenter) ? 6.5f : -6.5f;
                 }
 
                 GameObject forestTree = LoadAndInstantiate("Assets/Models/TeaTree/low-poly+tree+3d+model.glb", "TeaTree_" + i, new Vector3(xPos, -1.8f + 3.5f, zPos), Quaternion.Euler(0, Random.Range(0f, 360f), Random.Range(-6f, 6f)));
@@ -992,7 +1106,8 @@ namespace RungTramTraSu
             // Setup Player
             GameObject player = new GameObject("Player");
             player.tag = "Player";
-            player.transform.position = new Vector3(20f, -0.8f, -48f);
+            float playerStartY = GetHeightAt(20f, -48f) + 1.0f; // Spawn slightly above organic terrain
+            player.transform.position = new Vector3(20f, playerStartY, -48f);
 
             var charController = player.AddComponent<CharacterController>();
             charController.height = 2f;
@@ -1036,8 +1151,9 @@ namespace RungTramTraSu
 
             GameObject gameUI = CreateBaseGameUI(photoCam, cameraHandModel, out TextMeshProUGUI objText);
 
-            // Grandpa NPC (Dialogue guide)
-            GameObject grandpa = LoadAndInstantiate("Assets/Models/VietnameseGrandpa/Meshy_AI_Old_Man_with_Open_Arm_biped/Meshy_AI_Old_Man_with_Open_Arm_biped_Character_output.glb", "Grandpa_NPC", new Vector3(22.0f, -0.95f, -46f), Quaternion.identity);
+            // Grandpa NPC (Dialogue guide) - Stand on organic ground
+            float grandpaY = GetHeightAt(22.0f, -46f);
+            GameObject grandpa = LoadAndInstantiate("Assets/Models/VietnameseGrandpa/Meshy_AI_Old_Man_with_Open_Arm_biped/Meshy_AI_Old_Man_with_Open_Arm_biped_Character_output.glb", "Grandpa_NPC", new Vector3(22.0f, grandpaY, -46f), Quaternion.identity);
             if (grandpa != null)
             {
                 grandpa.transform.localScale = new Vector3(0.85f, 0.85f, 0.85f);
@@ -1108,12 +1224,83 @@ namespace RungTramTraSu
                 }
             };
 
-            spawnAnimal("PerchedStork_1", AnimalAI.AnimalType.Stork, new Vector3(14f, 4.8f, -12f), 7.0f, 0f);
-            spawnAnimal("PerchedStork_2", AnimalAI.AnimalType.Stork, new Vector3(28f, 5.2f, 15f), 7.0f, 0f);
+            // Explicitly spawn cajuput trees for the perched storks to sit on
+            float tree1Y = GetHeightAt(14f, -12f);
+            GameObject stork1Tree = LoadAndInstantiate("Assets/Models/TeaTree/low-poly+tree+3d+model.glb", "TeaTree_Stork1", new Vector3(14f, tree1Y + 3.5f, -12f), Quaternion.Euler(0, 45f, 0));
+            if (stork1Tree != null)
+            {
+                stork1Tree.transform.SetParent(forestContainer.transform);
+                stork1Tree.transform.localScale = new Vector3(11f, 11f, 11f);
+                stork1Tree.AddComponent<WindSway>();
+                GameObject trunkCol = new GameObject("TrunkCollider");
+                trunkCol.transform.SetParent(stork1Tree.transform, false);
+                trunkCol.transform.localScale = new Vector3(1f/11f, 1f/11f, 1f/11f);
+                var col = trunkCol.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, 1.5f, 0f);
+                col.radius = 0.5f;
+                col.height = 4.0f;
+            }
+
+            float tree2Y = GetHeightAt(28f, 15f);
+            GameObject stork2Tree = LoadAndInstantiate("Assets/Models/TeaTree/low-poly+tree+3d+model.glb", "TeaTree_Stork2", new Vector3(28f, tree2Y + 3.5f, 15f), Quaternion.Euler(0, -30f, 0));
+            if (stork2Tree != null)
+            {
+                stork2Tree.transform.SetParent(forestContainer.transform);
+                stork2Tree.transform.localScale = new Vector3(11f, 11f, 11f);
+                stork2Tree.AddComponent<WindSway>();
+                GameObject trunkCol = new GameObject("TrunkCollider");
+                trunkCol.transform.SetParent(stork2Tree.transform, false);
+                trunkCol.transform.localScale = new Vector3(1f/11f, 1f/11f, 1f/11f);
+                var col = trunkCol.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, 1.5f, 0f);
+                col.radius = 0.5f;
+                col.height = 4.0f;
+            }
+
+            // 6 con cò trắng lội trong kênh rải đều theo chiều dài
+            spawnAnimal("WadingStork_1", AnimalAI.AnimalType.Stork, new Vector3(20f, -0.3f, -25f), 3.0f, 3f);
+            spawnAnimal("WadingStork_2", AnimalAI.AnimalType.Stork, new Vector3(22f, -0.3f, -12f), 3.0f, 3f);
+            spawnAnimal("WadingStork_3", AnimalAI.AnimalType.Stork, new Vector3(21f, -0.3f,  -2f), 3.0f, 3f);
+            spawnAnimal("WadingStork_4", AnimalAI.AnimalType.Stork, new Vector3(23f, -0.3f,  10f), 3.0f, 3f);
+            spawnAnimal("WadingStork_5", AnimalAI.AnimalType.Stork, new Vector3(20f, -0.3f,  20f), 3.0f, 3f);
+            spawnAnimal("WadingStork_6", AnimalAI.AnimalType.Stork, new Vector3(24f, -0.3f,  30f), 3.0f, 3f);
+            
+            // Multiple snakes swimming in different parts of the canal
             spawnAnimal("SwimmingSnake_1", AnimalAI.AnimalType.Snake, new Vector3(22f, -0.95f, -22f), 2.0f, 5f);
+            spawnAnimal("SwimmingSnake_2", AnimalAI.AnimalType.Snake, new Vector3(24f, -0.95f, 2f), 1.8f, 4.5f);
+
+            // A school of multiple jumping fish in the canal/ponds!
             spawnAnimal("JumpingFish_1", AnimalAI.AnimalType.Fish, new Vector3(18f, -1.5f, -4f), 0f, 0f);
-            spawnAnimal("FlyingButterfly_1", AnimalAI.AnimalType.Butterfly, new Vector3(16f, 0.2f, 8f), 2.5f, 2.2f);
+            spawnAnimal("JumpingFish_2", AnimalAI.AnimalType.Fish, new Vector3(25f, -1.5f, -15f), 0f, 0f);
+            spawnAnimal("JumpingFish_3", AnimalAI.AnimalType.Fish, new Vector3(21f, -1.5f, 10f), 0f, 0f);
+            spawnAnimal("JumpingFish_4", AnimalAI.AnimalType.Fish, new Vector3(27f, -1.5f, -30f), 0f, 0f);
+            spawnAnimal("JumpingFish_5", AnimalAI.AnimalType.Fish, new Vector3(23f, -1.5f, 22f), 0f, 0f);
+
+            spawnAnimal("FlyingButterfly_1", AnimalAI.AnimalType.Butterfly, new Vector3(16f, 2.5f, 8f), 2.5f, 5.0f);
+            
+            // Multiple ducks swimming around
             spawnAnimal("FloatingDuck_1", AnimalAI.AnimalType.Duck, new Vector3(25f, -0.95f, 6f), 1.5f, 4f);
+            spawnAnimal("FloatingDuck_2", AnimalAI.AnimalType.Duck, new Vector3(22f, -0.95f, -8f), 1.7f, 3.5f);
+            spawnAnimal("FloatingDuck_3", AnimalAI.AnimalType.Duck, new Vector3(26f, -0.95f, 18f), 1.4f, 4.2f);
+
+            // Spawn wooden signs as visual checkpoint indicators for each animal habitat
+            float snakeSignY = GetHeightAt(18f, -22f);
+            CreateScenicWoodenSign("Đầm Rắn Nước", new Vector3(18f, snakeSignY, -22f), 45f);
+
+            float stork1SignY = GetHeightAt(17f, -12f);
+            CreateScenicWoodenSign("Nơi Cò Trắng Đậu", new Vector3(17f, stork1SignY, -12f), -45f);
+
+            float fishSignY = GetHeightAt(15f, -4f);
+            CreateScenicWoodenSign("Vùng Cá Lóc Nhảy", new Vector3(15f, fishSignY, -4f), 90f);
+
+            float duckSignY = GetHeightAt(20f, 6f);
+            CreateScenicWoodenSign("Đầm Vịt Trời", new Vector3(20f, duckSignY, 6f), -90f);
+
+            float butterflySignY = GetHeightAt(13f, 8f);
+            CreateScenicWoodenSign("Bướm Hoa Súng", new Vector3(13f, butterflySignY, 8f), 0f);
+
+            float stork2SignY = GetHeightAt(23f, 15f);
+            CreateScenicWoodenSign("Nơi Cò Trắng Đậu 2", new Vector3(23f, stork2SignY, 15f), 180f);
 
             // Managers
             GameObject managersObj = new GameObject("Managers");
@@ -1174,11 +1361,59 @@ namespace RungTramTraSu
             Material woodMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             woodMat.color = new Color(0.32f, 0.2f, 0.11f);
 
-            GameObject forestFloor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            forestFloor.name = "ForestFloor_Ground";
-            forestFloor.transform.position = new Vector3(25f, -0.5f, 15f);
-            forestFloor.transform.localScale = new Vector3(8f, 1f, 8f);
-            forestFloor.GetComponent<Renderer>().sharedMaterial = grassMat;
+            // A. Grid terrain (beautiful organic terrain with flat center for tower!)
+            GameObject terrainObj = new GameObject("OrganicTerrain_Bank");
+            MeshFilter meshFilter = terrainObj.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = terrainObj.AddComponent<MeshRenderer>();
+            MeshCollider meshCollider = terrainObj.AddComponent<MeshCollider>();
+
+            Mesh terrainMesh = new Mesh();
+            int xSegments = 120;
+            int zSegments = 120;
+            int numVertices = (xSegments + 1) * (zSegments + 1);
+            Vector3[] vertices = new Vector3[numVertices];
+            Vector2[] uvs = new Vector2[numVertices];
+            int[] triangles = new int[xSegments * zSegments * 6];
+
+            float xMin = -55f, xMax = 55f, zMin = -65f, zMax = 65f;
+            int vIndex = 0;
+            for (int z = 0; z <= zSegments; z++)
+            {
+                float zPct = (float)z / zSegments;
+                float zPos = Mathf.Lerp(zMin, zMax, zPct);
+                for (int x = 0; x <= xSegments; x++)
+                {
+                    float xPct = (float)x / xSegments;
+                    float xPos = Mathf.Lerp(xMin, xMax, xPct);
+                    float yPos = SceneBeautifierAll.GetPhase5HeightAt(xPos, zPos);
+                    vertices[vIndex] = new Vector3(xPos, yPos, zPos);
+                    uvs[vIndex] = new Vector2(xPos * 0.12f, zPos * 0.12f);
+                    vIndex++;
+                }
+            }
+
+            int tIndex = 0;
+            for (int z = 0; z < zSegments; z++)
+            {
+                for (int x = 0; x < xSegments; x++)
+                {
+                    int row1 = z * (xSegments + 1);
+                    int row2 = (z + 1) * (xSegments + 1);
+                    triangles[tIndex++] = row1 + x;
+                    triangles[tIndex++] = row2 + x;
+                    triangles[tIndex++] = row1 + x + 1;
+                    triangles[tIndex++] = row1 + x + 1;
+                    triangles[tIndex++] = row2 + x;
+                    triangles[tIndex++] = row2 + x + 1;
+                }
+            }
+            terrainMesh.vertices = vertices;
+            terrainMesh.uv = uvs;
+            terrainMesh.triangles = triangles;
+            terrainMesh.RecalculateNormals();
+            meshFilter.sharedMesh = terrainMesh;
+            meshCollider.sharedMesh = terrainMesh;
+            meshRenderer.sharedMaterial = grassMat;
 
             // Observation Tower (Premium structure with corner posts, landing platforms, straight stairs and smooth ramp colliders)
             Vector3 towerCenter = new Vector3(25f, -0.5f, 15f);
@@ -1351,7 +1586,8 @@ namespace RungTramTraSu
             roofRight.GetComponent<Renderer>().sharedMaterial = activeWoodMat;
 
             // Biển báo gỗ mộc mạc tại vọng cảnh đài
-            CreateScenicWoodenSign("Vọng Cảnh Đài\n(Đỉnh Kính Vọng)", new Vector3(towerCenter.x + 3f, -0.3f, 10f), -20f);
+            float signY = SceneBeautifierAll.GetPhase5HeightAt(towerCenter.x + 3f, 10f);
+            CreateScenicWoodenSign("Vọng Cảnh Đài\n(Đỉnh Kính Vọng)", new Vector3(towerCenter.x + 3f, signY, 10f), -20f);
 
             // Spawning 120 trees surrounding the clearing (circle boundary forest)
             Random.InitState(888);
@@ -1362,7 +1598,7 @@ namespace RungTramTraSu
                 float radius = Random.Range(24f, 42f);
                 float xPos = towerCenter.x + Mathf.Cos(angle) * radius;
                 float zPos = towerCenter.z + Mathf.Sin(angle) * radius;
-                float yPos = -0.5f;
+                float yPos = SceneBeautifierAll.GetPhase5HeightAt(xPos, zPos);
 
                 GameObject forestTree = LoadAndInstantiate("Assets/Models/TeaTree/low-poly+tree+3d+model.glb", "TeaTree_" + i, new Vector3(xPos, yPos + 3.5f, zPos), Quaternion.Euler(0, Random.Range(0f, 360f), 0));
                 if (forestTree != null)
