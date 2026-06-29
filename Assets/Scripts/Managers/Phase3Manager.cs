@@ -117,7 +117,9 @@ namespace RungTramTraSu
             }
 
             Vector3 targetPos = waypoints[currentWaypointIndex];
-            targetPos.y = boat.position.y;
+            // Bug 9 fix: Không override targetPos.y bằng boat.position.y
+            // Cho phép WaterFloat xử lý Y động lực, waypoint chỉ định hướng X/Z
+            // Nếu có WaterFloat thì nó sẽ giữ đúng Y; waypoint Y = -0.82f là giá trị mặc định
             boat.position = Vector3.MoveTowards(boat.position, targetPos, boatSpeed * Time.deltaTime);
 
             Vector3 direction = targetPos - boat.position;
@@ -147,10 +149,21 @@ namespace RungTramTraSu
 
         private IEnumerator TransitionRoutine()
         {
-            // Wait for dialogue if not finished
+            // Bug 10 fix: Thêm timeout fallback (30s) để tránh block vĩnh viễn
+            // nếu DialogueManager null hoặc dialogue không bao giờ complete
             if (!dialogueCompleted)
             {
-                yield return new WaitUntil(() => dialogueCompleted);
+                float timeoutSeconds = 30f;
+                float elapsed = 0f;
+                while (!dialogueCompleted && elapsed < timeoutSeconds)
+                {
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+                if (!dialogueCompleted)
+                {
+                    Debug.LogWarning("[Phase3Manager] Dialogue timeout sau " + timeoutSeconds + "s, tiếp tục chuyển cảnh.");
+                }
             }
             yield return new WaitForSeconds(2.0f);
 
@@ -171,7 +184,8 @@ namespace RungTramTraSu
 
             if (ScreenFader.Instance != null)
             {
-                ScreenFader.Instance.StartFadeOut(2.5f, () => {
+                ScreenFader.Instance.StartFadeOut(2.5f, () =>
+                {
                     SceneManager.LoadScene("Phase4_Sanctuary");
                 });
             }
@@ -217,7 +231,8 @@ namespace RungTramTraSu
             float z = boat.position.z;
 
             // Trigger Flock 1 at Z = -35f
-            if (!flock1Triggered && z >= -35f && z < -30f)
+            // Bug 11 fix: mở rộng window từ 5 lên 15 đơn vị Z để không bỏ lỡ
+            if (!flock1Triggered && z >= -35f && z < -20f)
             {
                 flock1Triggered = true;
                 SpawnFlyingFlock(
@@ -230,7 +245,7 @@ namespace RungTramTraSu
             }
 
             // Trigger Flock 2 at Z = 0f
-            if (!flock2Triggered && z >= 0f && z < 5f)
+            if (!flock2Triggered && z >= 0f && z < 15f)
             {
                 flock2Triggered = true;
                 SpawnFlyingFlock(
@@ -243,7 +258,7 @@ namespace RungTramTraSu
             }
 
             // Trigger Flock 3 at Z = 25f
-            if (!flock3Triggered && z >= 25f && z < 30f)
+            if (!flock3Triggered && z >= 25f && z < 40f)
             {
                 flock3Triggered = true;
                 SpawnFlyingFlock(

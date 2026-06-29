@@ -166,22 +166,23 @@ namespace RungTramTraSu
         {
             float z = boat.position.z;
 
-            // Checkpoint 1: Z = -20f (Tốc độ Chậm)
-            if (!checkpoint1Triggered && z >= -20f && z < -10f)
+            // Checkpoint 1: Z >= -20f
+            // Bug 5 fix: bỏ upper bound để không bao giờ bỏ lỡ nếu boat bắt đầu ở Z cao hơn
+            if (!checkpoint1Triggered && z >= -20f)
             {
                 checkpoint1Triggered = true;
                 TriggerCheckpoint(1, 1.8f, "Phase2_Ch1", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ CHẬM).");
             }
 
-            // Checkpoint 2: Z = 15f (Tốc độ Vừa)
-            if (!checkpoint2Triggered && z >= 15f && z < 25f)
+            // Checkpoint 2: Z >= 15f (sau khi đã qua Checkpoint 1)
+            if (!checkpoint2Triggered && z >= 15f)
             {
                 checkpoint2Triggered = true;
                 TriggerCheckpoint(2, 4.0f, "Phase2_Ch2", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ VỪA).");
             }
 
-            // Checkpoint 3: Z = 40f (Tốc độ Nhanh)
-            if (!checkpoint3Triggered && z >= 40f && z < 48f)
+            // Checkpoint 3: Z >= 40f
+            if (!checkpoint3Triggered && z >= 40f)
             {
                 checkpoint3Triggered = true;
                 TriggerCheckpoint(3, 7.5f, "Phase2_Ch3", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ NHANH).");
@@ -245,6 +246,9 @@ namespace RungTramTraSu
             {
                 photoCamera.UnlockCamera();
                 photoCamera.SetPhotoCategory(category);
+                // Bug 6 fix: Tắt auto-capture của PhotoCamera để tránh double-capture
+                // Phase2Manager tự xử lý click qua CheckBirdCapture()
+                photoCamera.SetCaptureEnabled(false);
             }
 
             UpdateObjectiveText($"Checkpoint {number}: {instructionText} (0/3)");
@@ -438,6 +442,9 @@ namespace RungTramTraSu
 
             if (flightCoroutine != null) StopCoroutine(flightCoroutine);
 
+            // Bug 6 fix: Bật lại PhotoCamera capture khi rời bird-checkpoint mode
+            if (photoCamera != null) photoCamera.SetCaptureEnabled(true);
+
             string[] dialogueLines;
             if (sarusCraneCapturedAtCurrentCheckpoint)
             {
@@ -464,6 +471,21 @@ namespace RungTramTraSu
         public void OnPhotoQuestCompleted()
         {
             // Handled internally in CheckBirdCapture
+        }
+
+        private void OnDestroy()
+        {
+            // Bug 8 fix: Dọn dẹp khi scene unload để tránh MissingReferenceException
+            isAtCheckpoint = false;
+            isTravelling = false;
+            if (flightCoroutine != null)
+            {
+                StopCoroutine(flightCoroutine);
+                flightCoroutine = null;
+            }
+            ClearActiveBirds();
+            // Bật lại capture nếu bị tắt trước khi destroy
+            if (photoCamera != null) photoCamera.SetCaptureEnabled(true);
         }
 
         private void ReachEnd()

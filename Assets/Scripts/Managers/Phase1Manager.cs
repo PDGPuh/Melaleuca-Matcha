@@ -36,8 +36,18 @@ namespace RungTramTraSu
 
         // Biến lưu trữ tấm ảnh chụp tạm thời
         private Texture2D capturedPhoto;
+        // Guard tránh gọi intro dialogue nhiều lần khi player nhấn E liên tiếp (Bug 3)
+        private bool isIntroDialogueStarted = false;
+        // Flag dùng để đóng popup sau khi đoạn dialogue-safe (Bug 2)
+        private bool popupReadyToClose = false;
 
         public Phase1State CurrentState => currentState;
+        // Property cho NPCGrandpa đọc/ghi để guard intro dialogue (Bug 3)
+        public bool IsIntroDialogueStarted
+        {
+            get => isIntroDialogueStarted;
+            set => isIntroDialogueStarted = value;
+        }
 
         private void Awake()
         {
@@ -55,6 +65,8 @@ namespace RungTramTraSu
         private void Start()
         {
             currentState = Phase1State.Intro;
+            isIntroDialogueStarted = false;
+            popupReadyToClose = false;
 
             // Khởi đầu ẩn model máy ảnh trên tay người chơi và tắt vùng trigger lên xuồng
             if (cameraHandModel != null) cameraHandModel.SetActive(false);
@@ -71,14 +83,25 @@ namespace RungTramTraSu
             if (cameraPopupPanel != null)
             {
                 cameraPopupPanel.SetActive(true);
+                popupReadyToClose = false; // Reset flag mỗi lần popup mở
                 // Khóa di chuyển để xem pop-up
                 PlayerController player = FindAnyObjectByType<PlayerController>();
                 if (player != null) player.SetFrozen(true);
+
+                // Đặt flag sau 1 frame để tránh click dư từ dialogue bấm E
+                StartCoroutine(AllowPopupCloseNextFrame());
             }
             else
             {
                 OnCloseCameraPopup();
             }
+        }
+
+        private System.Collections.IEnumerator AllowPopupCloseNextFrame()
+        {
+            yield return null; // Chờ 1 frame
+            yield return null; // Chờ thêm 1 frame cho chắc
+            popupReadyToClose = true;
         }
 
         public void OnCloseCameraPopup()
@@ -104,10 +127,12 @@ namespace RungTramTraSu
 
         private void Update()
         {
-            if (cameraPopupPanel != null && cameraPopupPanel.activeSelf)
+            if (cameraPopupPanel != null && cameraPopupPanel.activeSelf && popupReadyToClose)
             {
                 // Nhấn Space, Enter hoặc Click chuột để đóng pop-up máy ảnh
-                if ((Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame)) || 
+                // Không sử dụng leftButton.wasPressedThisFrame vì DialogueManager cũng ngịhe
+                // sự kiện đó và có thể gây ra double-fire
+                if ((Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame)) ||
                     (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame))
                 {
                     OnCloseCameraPopup();

@@ -32,9 +32,12 @@ namespace RungTramTraSu
         private float targetFOV;
         private bool isTakingPhoto = false;
         private string currentPhotoCategory = "General";
+        // Khi false, PhotoCamera sẽ không chụp ảnh (dùng cho Phase2 bird-checkpoint mode)
+        private bool captureEnabled = true;
 
         public bool HasCamera => hasCamera;
         public bool IsZooming => isZooming;
+        public bool IsTakingPhoto => isTakingPhoto;
 
         private void Awake()
         {
@@ -151,6 +154,13 @@ namespace RungTramTraSu
 
         private void HandleCapture()
         {
+            // Không chụp nếu capture bị tắt (ví dụ: Phase2 bird mode)
+            if (!captureEnabled) return;
+
+            // Không chụp nếu player đang bị frozen (dialogue đang mở)
+            PlayerController player = FindAnyObjectByType<PlayerController>();
+            if (player != null && player.IsFrozen) return;
+
             // Nhấn chuột trái để chụp ảnh khi đang ngắm (zoom)
             if (isZooming && Mouse.current.leftButton.wasPressedThisFrame)
             {
@@ -288,6 +298,16 @@ namespace RungTramTraSu
         public void UnlockCamera()
         {
             hasCamera = true;
+        }
+
+        /// <summary>
+        /// Bật/tắt cơ chế chụp ảnh tự động của PhotoCamera.
+        /// Phase2Manager gọi SetCaptureEnabled(false) khi đang ở bird-checkpoint mode
+        /// để tránh double-capture.
+        /// </summary>
+        public void SetCaptureEnabled(bool enabled)
+        {
+            captureEnabled = enabled;
         }
 
         /// <summary>

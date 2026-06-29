@@ -76,9 +76,14 @@ namespace RungTramTraSu
             {
                 case Phase1Manager.Phase1State.Intro:
                     // Bắt đầu hội thoại lần đầu, sau đó kích hoạt nhận máy ảnh
-                    DialogueManager.Instance.ShowDialogue("Ông Ngoại", introDialogue, () => {
-                        manager.GiveCameraToPlayer();
-                    });
+                    // Guard: chỉ trigger nếu chưa bắt đầu (tránh nhấn E nhiều lần)
+                    if (!manager.IsIntroDialogueStarted)
+                    {
+                        manager.IsIntroDialogueStarted = true;
+                        DialogueManager.Instance.ShowDialogue("Ông Ngoại", introDialogue, () => {
+                            manager.GiveCameraToPlayer();
+                        });
+                    }
                     break;
 
                 case Phase1Manager.Phase1State.TakingPhoto:

@@ -48,6 +48,7 @@ namespace RungTramTraSu
         private float swimVerticalVelocity = 0f;
 
         public bool IsCrouching => isCrouching;
+        public bool IsFrozen => isFrozen;
 
         private void Awake()
         {
