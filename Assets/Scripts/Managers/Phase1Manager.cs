@@ -120,6 +120,12 @@ namespace RungTramTraSu
                 photoCamera.UnlockCamera();
                 photoCamera.SetPhotoCategory("Phase1_Mango");
                 photoCamera.SetQuestTarget(mangoTreeTarget);
+                // Set tên chủ thể để PhotoResultUI hiển thị sau khi chụp
+                photoCamera.SetSubjectInfo(
+                    "🌳 Cây Xoài",
+                    "Xoài là cây ăn quả lâu năm đặc trưng của vùng Đồng bằng sông Cửu Long.\n" +
+                    "Quả xoài chín thơm ngọt, là đặc sản nổi tiếng của miền Tây Nam Bộ."
+                );
             }
 
             UpdateObjectiveText("Mục tiêu: Giữ Chuột Phải để ngắm, nhấn Chuột Trái để chụp ảnh Cây Xoài to trong vườn.");

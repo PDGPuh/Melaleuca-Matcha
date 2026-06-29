@@ -82,6 +82,12 @@ namespace RungTramTraSu
             {
                 photoCamera.UnlockCamera();
                 photoCamera.SetPhotoCategory("Phase3_Canal");
+                // Set thông tin chủ thể mặc định – Phase 3 là chụp tự do ngắm cảnh
+                photoCamera.SetSubjectInfo(
+                    "🌿 Rừng Tràm Trà Sư",
+                    "Rừng tràm Trà Sư là khu bảo tồn đất ngập nước quan trọng tại An Giang,\n" +
+                    "nơi trú ngụ của hàng trăm loài chim và sinh vật hoang dã quý hiếm."
+                );
             }
 
             UpdateObjectiveText("Thư giãn ngắm cảnh rừng tràm rậm rạp và lắng nghe Ông Ngoại kể chuyện...");

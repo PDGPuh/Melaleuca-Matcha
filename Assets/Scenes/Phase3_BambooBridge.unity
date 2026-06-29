@@ -9158,7 +9158,6 @@ GameObject:
   - component: {fileID: 1215126158}
   - component: {fileID: 1215126161}
   - component: {fileID: 1215126160}
-  - component: {fileID: 1215126159}
   m_Layer: 0
   m_Name: DiaryPanel
   m_TagString: Untagged
@@ -9197,30 +9196,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1215126159
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1215126157}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 961bca44410a1074cb9b77b844e16b7c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RungTramTraSu.DiaryUIController
-  diaryPanel: {fileID: 1215126157}
-  imgPhase1Mango: {fileID: 657364293}
-  imgPhase2Ch1: {fileID: 1929465287}
-  imgPhase2Ch2: {fileID: 1745878856}
-  imgPhase2Ch3: {fileID: 106173660}
-  imgPhase4Stork: {fileID: 359093107}
-  imgPhase4Snake: {fileID: 189030756}
-  imgPhase4Fish: {fileID: 2123112507}
-  imgPhase4Butterfly: {fileID: 1859760832}
-  imgPhase4Duck: {fileID: 743950503}
-  imgPhase5Sunset: {fileID: 1965988702}
-  cameraInventoryIcon: {fileID: 21009044}
 --- !u!114 &1215126160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9676,6 +9651,7 @@ GameObject:
   - component: {fileID: 1287307326}
   - component: {fileID: 1287307325}
   - component: {fileID: 1287307324}
+  - component: {fileID: 1287307328}
   m_Layer: 0
   m_Name: GameUI
   m_TagString: Untagged
@@ -9787,6 +9763,30 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &1287307328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1287307322}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 961bca44410a1074cb9b77b844e16b7c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RungTramTraSu.DiaryUIController
+  diaryPanel: {fileID: 1215126157}
+  imgPhase1Mango: {fileID: 657364293}
+  imgPhase2Ch1: {fileID: 1929465287}
+  imgPhase2Ch2: {fileID: 1745878856}
+  imgPhase2Ch3: {fileID: 106173660}
+  imgPhase4Stork: {fileID: 359093107}
+  imgPhase4Snake: {fileID: 189030756}
+  imgPhase4Fish: {fileID: 2123112507}
+  imgPhase4Butterfly: {fileID: 1859760832}
+  imgPhase4Duck: {fileID: 743950503}
+  imgPhase5Sunset: {fileID: 1965988702}
+  cameraInventoryIcon: {fileID: 21009044}
 --- !u!1 &1304139097
 GameObject:
   m_ObjectHideFlags: 0

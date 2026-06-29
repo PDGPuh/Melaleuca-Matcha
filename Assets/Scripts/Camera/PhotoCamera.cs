@@ -34,6 +34,9 @@ namespace RungTramTraSu
         private string currentPhotoCategory = "General";
         // Khi false, PhotoCamera sẽ không chụp ảnh (dùng cho Phase2 bird-checkpoint mode)
         private bool captureEnabled = true;
+        // Thông tin chủ thể được set bởi Phase Manager trước khi chụp
+        private string currentSubjectName = "Phống cảnh";
+        private string currentSubjectDescription = "Một khoảnh khắc đẹp của rừng tràm miền Tây.";
 
         public bool HasCamera => hasCamera;
         public bool IsZooming => isZooming;
@@ -168,46 +171,65 @@ namespace RungTramTraSu
             }
         }
 
-        private IEnumerator TakePhotoRoutine()
+        public void PlayShutterAndFlash()
         {
-            isTakingPhoto = true;
-
-            // 1. Phát âm thanh chụp
             if (audioSource != null && shutterSound != null)
             {
                 audioSource.PlayOneShot(shutterSound);
             }
-
-            // 2. Chớp đèn Flash
             if (flashImage != null)
             {
-                flashImage.gameObject.SetActive(true);
-                // Fade-in trắng xóa nhanh
-                float elapsed = 0;
-                while (elapsed < flashDuration * 0.3f)
-                {
-                    elapsed += Time.deltaTime;
-                    flashImage.color = new Color(1, 1, 1, Mathf.Lerp(0, 1, elapsed / (flashDuration * 0.3f)));
-                    yield return null;
-                }
+                StartCoroutine(FlashRoutine());
             }
+        }
 
-            // 3. Chụp màn hình (Chụp sạch - ẩn UI)
+        private IEnumerator FlashRoutine()
+        {
+            flashImage.gameObject.SetActive(true);
+            // Fade-in nhanh (trắng xóa)
+            float eIn = 0f;
+            while (eIn < flashDuration * 0.3f)
+            {
+                eIn += Time.deltaTime;
+                flashImage.color = new Color(1, 1, 1, Mathf.Lerp(0, 1, eIn / (flashDuration * 0.3f)));
+                yield return null;
+            }
+            // Fade-out chậm
+            float eOut = 0f;
+            while (eOut < flashDuration * 0.7f)
+            {
+                eOut += Time.deltaTime;
+                flashImage.color = new Color(1, 1, 1, Mathf.Lerp(1, 0, eOut / (flashDuration * 0.7f)));
+                yield return null;
+            }
+            flashImage.color = new Color(1, 1, 1, 0);
+            flashImage.gameObject.SetActive(false);
+        }
+
+        private IEnumerator TakePhotoRoutine()
+        {
+            isTakingPhoto = true;
+
+            // ── Bước 1: Ẩn UI viewfinder trước khi chụp ──────────────────────────────
             if (viewfinderCanvas != null) viewfinderCanvas.SetActive(false);
-            
-            // Chờ kết thúc frame để chụp chính xác render camera
+
+            // ── Bước 2: Chụp screenshot NGAY ĐẦU (trước khi flash bật) ──────────────
+            // WaitForEndOfFrame đảm bảo frame hiện tại render xong mới ReadPixels
             yield return new WaitForEndOfFrame();
 
-            int width = Screen.width;
+            int width  = Screen.width;
             int height = Screen.height;
             Texture2D capturedTex = new Texture2D(width, height, TextureFormat.RGB24, false);
             capturedTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
             capturedTex.Apply();
 
-            // Khôi phục lại UI
+            // ── Bước 3: Phát âm thanh shutter + flash (sau khi đã chụp) ─────────────
+            PlayShutterAndFlash();
+
+            // Khôi phục viewfinder nếu vẫn đang zoom
             if (isZooming && viewfinderCanvas != null) viewfinderCanvas.SetActive(true);
 
-            // Lưu ảnh vào PersistentGameManager hoặc Phase1Manager
+            // ── Bước 4: Lưu ảnh ──────────────────────────────────────────────────────
             if (PersistentGameManager.Instance != null)
             {
                 PersistentGameManager.Instance.SavePhoto(currentPhotoCategory, capturedTex);
@@ -217,28 +239,28 @@ namespace RungTramTraSu
                 Phase1Manager.Instance.SavePhoto(capturedTex);
             }
 
-            // 4. Kiểm tra xem mục tiêu nhiệm vụ có trong khung hình không
-            ValidatePhotoContent();
+            // ── Bước 5: Kiểm tra mục tiêu ────────────────────────────────────────────
+            bool photoSuccess = ValidatePhotoContent();
 
-            // 5. Fade-out đèn Flash
-            if (flashImage != null)
-            {
-                float elapsed = 0;
-                while (elapsed < flashDuration * 0.7f)
-                {
-                    elapsed += Time.deltaTime;
-                    flashImage.color = new Color(1, 1, 1, Mathf.Lerp(1, 0, elapsed / (flashDuration * 0.7f)));
-                    yield return null;
-                }
-                flashImage.gameObject.SetActive(false);
-            }
+            string displayName = photoSuccess ? currentSubjectName : "Không rõ chủ thể";
+            string displayDesc = photoSuccess
+                ? currentSubjectDescription
+                : "Mục tiêu không nằm trong khung ngắm trung tâm. Thử lại nhé!";
 
             isTakingPhoto = false;
+
+            // ── Bước 6: Hiển thị PhotoResultUI ───────────────────────────────────────
+            PhotoResultUI.Instance.ShowResult(capturedTex, displayName, displayDesc);
         }
 
-        private void ValidatePhotoContent()
+
+        /// <summary>
+        /// Kiểm tra mục tiêu quest có trong viewport không.
+        /// Trả về true nếu chụp thành công.
+        /// </summary>
+        private bool ValidatePhotoContent()
         {
-            if (questTarget == null) return;
+            if (questTarget == null) return false;
 
             // Determine the actual visual center of the target (using its Collider bounds center if available)
             Vector3 targetPosition = questTarget.position;
@@ -255,40 +277,38 @@ namespace RungTramTraSu
             // Chuyển vị trí mục tiêu từ tọa độ World sang Viewport của Camera
             Vector3 viewportPoint = playerCamera.WorldToViewportPoint(targetPosition);
 
-            // Kiểm tra xem mục tiêu:
-            // - Có nằm ở phía trước camera hay không (z > 0)
-            // - Có nằm trong phạm vi hiển thị màn hình hay không (x, y từ 0.0 đến 1.0)
-            // - Để ảnh đẹp, yêu cầu mục tiêu nằm ở vùng trung tâm (x, y từ 0.2 đến 0.8)
-            bool isVisible = viewportPoint.z > 0 && 
-                             viewportPoint.x >= 0.2f && viewportPoint.x <= 0.8f && 
+            bool isVisible = viewportPoint.z > 0 &&
+                             viewportPoint.x >= 0.2f && viewportPoint.x <= 0.8f &&
                              viewportPoint.y >= 0.2f && viewportPoint.y <= 0.8f;
 
             if (isVisible)
             {
-                // Kiểm tra xem mục tiêu có bị vật cản (như tường, nhà) che mất không
+                // Kiểm tra occlusion
                 RaycastHit hit;
                 Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
-                if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit, directionToTarget.magnitude + 1f, occlusionLayers))
+                if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit,
+                                    directionToTarget.magnitude + 1f, occlusionLayers))
                 {
-                    // Nếu va chạm trúng vật khác trước mục tiêu
                     if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
                     {
                         Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
-                        return; // Bị che khuất
+                        return false;
                     }
                 }
 
-                // Chụp ảnh thành công! Báo về Phase1Manager
+                // Chụp ảnh thành công! Báo về Phase Managers
                 Debug.Log("Chụp ảnh mục tiêu thành công!");
                 if (Phase1Manager.Instance != null) Phase1Manager.Instance.OnPhotoQuestCompleted();
                 if (Phase2Manager.Instance != null) Phase2Manager.Instance.OnPhotoQuestCompleted();
                 if (Phase3Manager.Instance != null) Phase3Manager.Instance.OnPhotoQuestCompleted();
                 if (Phase4Manager.Instance != null) Phase4Manager.Instance.OnPhotoQuestCompleted();
                 if (Phase5Manager.Instance != null) Phase5Manager.Instance.OnPhotoQuestCompleted();
+                return true;
             }
             else
             {
-                Debug.Log("Mục tiêu nằm ngoài tầm ngắm trung tâm. Tọa độ Viewport: " + viewportPoint);
+                Debug.Log("Mục tiêu nằm ngoài tầm ngắm trung tâm. Viewport: " + viewportPoint);
+                return false;
             }
         }
 
@@ -321,6 +341,16 @@ namespace RungTramTraSu
         public void SetPhotoCategory(string category)
         {
             currentPhotoCategory = category;
+        }
+
+        /// <summary>
+        /// Thiết lập thông tin chủ thể được chụp.
+        /// Gọi bởi Phase Manager trước khi unlock camera.
+        /// </summary>
+        public void SetSubjectInfo(string name, string description)
+        {
+            currentSubjectName = name;
+            currentSubjectDescription = description;
         }
 
         private void UpdateDynamicCategory()
