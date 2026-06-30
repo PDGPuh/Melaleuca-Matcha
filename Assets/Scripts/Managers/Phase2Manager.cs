@@ -118,6 +118,9 @@ namespace RungTramTraSu
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", intro);
         }
 
+        // Guard tránh double-capture khi coroutine đang chạy
+        private bool isHandlingCapture = false;
+
         private void Update()
         {
             if (isTravelling)
@@ -126,12 +129,14 @@ namespace RungTramTraSu
                 CheckEvents();
             }
 
-            // Kiểm tra ngắm bắn chim khi đang dừng ở Checkpoint
-            if (isAtCheckpoint && Mouse.current.leftButton.wasPressedThisFrame && photoCamera != null)
+            // Kiểm tra ngắm chụp chim khi đang dừng ở Checkpoint
+            // Sử dụng coroutine để có thể chụp screenshot async + show PhotoResultUI
+            if (isAtCheckpoint && !isHandlingCapture &&
+                Mouse.current.leftButton.wasPressedThisFrame && photoCamera != null)
             {
                 if (photoCamera.IsZooming)
                 {
-                    CheckBirdCapture();
+                    StartCoroutine(BirdCaptureWithPhotoRoutine());
                 }
             }
         }
@@ -166,22 +171,23 @@ namespace RungTramTraSu
         {
             float z = boat.position.z;
 
-            // Checkpoint 1: Z = -20f (Tốc độ Chậm)
-            if (!checkpoint1Triggered && z >= -20f && z < -10f)
+            // Checkpoint 1: Z >= -20f
+            // Bug 5 fix: bỏ upper bound để không bao giờ bỏ lỡ nếu boat bắt đầu ở Z cao hơn
+            if (!checkpoint1Triggered && z >= -20f)
             {
                 checkpoint1Triggered = true;
                 TriggerCheckpoint(1, 1.8f, "Phase2_Ch1", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ CHẬM).");
             }
 
-            // Checkpoint 2: Z = 15f (Tốc độ Vừa)
-            if (!checkpoint2Triggered && z >= 15f && z < 25f)
+            // Checkpoint 2: Z >= 15f (sau khi đã qua Checkpoint 1)
+            if (!checkpoint2Triggered && z >= 15f)
             {
                 checkpoint2Triggered = true;
                 TriggerCheckpoint(2, 4.0f, "Phase2_Ch2", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ VỪA).");
             }
 
-            // Checkpoint 3: Z = 40f (Tốc độ Nhanh)
-            if (!checkpoint3Triggered && z >= 40f && z < 48f)
+            // Checkpoint 3: Z >= 40f
+            if (!checkpoint3Triggered && z >= 40f)
             {
                 checkpoint3Triggered = true;
                 TriggerCheckpoint(3, 7.5f, "Phase2_Ch3", "Nhấn chuột phải ngắm, trái chụp 3 con chim bay (Tốc độ NHANH).");
@@ -245,16 +251,14 @@ namespace RungTramTraSu
             {
                 photoCamera.UnlockCamera();
                 photoCamera.SetPhotoCategory(category);
+                // Bug 6 fix: Tắt auto-capture của PhotoCamera để tránh double-capture
+                // Phase2Manager tự xử lý click qua CheckBirdCapture()
+                photoCamera.SetCaptureEnabled(false);
             }
 
             UpdateObjectiveText($"Checkpoint {number}: {instructionText} (0/3)");
-
-            string speedText = number == 1 ? "từ từ thong thả" : (number == 2 ? "bay hơi nhanh hơn chút" : "bay rất nhanh lướt qua");
-            string speciesNames = number == 1 ? "Cò trắng, Diệc xám, Cò ốc, Già đẫy" : (number == 2 ? "Vạc, Cồng cộc, Cò bợ, Trích cùi, Điêng điểng" : "Bói cá, Le le, Bìm bịp, Én");
-            
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
-                $"Tới Checkpoint {number} rồi nè con. Chim sắp sửa bay ngang qua đó con.",
-                $"Đợt này chim sẽ bay {speedText}. Có các loài: {speciesNames}.",
+                "Tới Checkpoint rồi nè con. Chim sắp sửa bay ngang qua đó con.",
                 "Con lấy máy ảnh ra sẵn đi, ngắm sẵn rồi chụp nghe!"
             });
 
@@ -375,61 +379,135 @@ namespace RungTramTraSu
             }
         }
 
-        private void CheckBirdCapture()
+        // ─── Bảng mô tả các loài chim theo tên tiếng Việt ──────────────────────────────
+        private static readonly System.Collections.Generic.Dictionary<string, string> BirdDescriptions =
+            new System.Collections.Generic.Dictionary<string, string>
         {
-            if (activeBirds.Count == 0) return;
+            { "Cò trắng",    "Áo trắng muốt, chân đen đặc trưng. Cò trắng bay lướt trên ngọn tràm, kiếm ăn ở vùng đất ngập nước miền Tây." },
+            { "Diệc xám",    "Diệc xám là loài chim lớn bay điềm tĩnh, cổ dài đặc trưng, thường đứng cô đơn trên mặt nước." },
+            { "Cò ốc",       "Cò ốc có mỏ cong chuyên ăn ốc và nhuyễn thể nước. Là loài quen thuộc của đồng bằng sông Cửu Long." },
+            { "Già đẫy",     "Già đẫy có màu nâu xám, bay chậm rãi một mình. Loài này rất hiếm gặp ở các khu rừng ngập nước." },
+            { "Vạc",         "Vạc thường kiếm ăn vào ban đêm. Ban ngày chúng trú ẩn trong tán tràm rậm rạp gần mặt nước." },
+            { "Cồng cộc",    "Cồng cộc hay lặn sâu xuống nước bắt cá. Lông đen bóng, mắt xanh lá đặc biệt nổi bật." },
+            { "Cò bợ",       "Cò bợ nhỏ nhắn, thường kiếm ăn ở rìa đầm lầy. Thành lập từng đàn lớn theo mùa nước nổi." },
+            { "Trích cùi",   "Trích cùi nhỏ nhắn, bay lướt trên mặt nước. Là loài chim di cư quý theo mùa." },
+            { "Điêng điểng", "Điêng điểng có màu nâu đốm, tiếng kêu vắng vỏi giữa rừng tràm yên tĩnh." },
+            { "Bói cá",      "Bói cá sặc sỡ nhất trong số các loài chim rừng tràm – đầu xanh, ngực cam rực rỡ." },
+            { "Le le",       "Le le là loài vịt hoang phổ biến miền Tây, thường lướt qua mặt kênh theo đàn lớn." },
+            { "Bìm bịp",     "Bìm bịp tiếng kêu như tiếng búa lớn, thường ẩn mình trong bụi sậy và được người nông thôn mến yêu." },
+            { "Én",          "Én bay lướt rất nhanh – dấu hiệu báo mưa đến gần theo tiết trời miền Tây." },
+            { "Sếu đầu đỏ",  "Loài chim quý nằm trong Sách Đỏ Việt Nam! Sếu đầu đỏ rất hiếm gặp, là biểu tượng của sự bảo tồn thiên nhiên Việt Nam." },
+        };
+
+        private string GetBirdDescription(string birdName)
+        {
+            if (BirdDescriptions.TryGetValue(birdName, out string desc))
+                return desc;
+            return "Một loài chim của vùng đất ngập nước miền Tây Nam Bộ.";
+        }
+
+        // ─── Coroutine: chụp screenshot + hiển thị PhotoResultUI ─────────────────────
+        private IEnumerator BirdCaptureWithPhotoRoutine()
+        {
+            isHandlingCapture = true;
+
+            // 1. Phát hiện chim trong viewport (sync)
+            if (activeBirds.Count == 0) { isHandlingCapture = false; yield break; }
             Camera cam = Camera.main;
-            if (cam == null) return;
+            if (cam == null) { isHandlingCapture = false; yield break; }
 
             int hits = 0;
             List<GameObject> capturedThisFrame = new List<GameObject>();
+            string firstBirdName = "Chim hoang dã";
+            bool firstIsSarus = false;
 
             foreach (var bird in activeBirds)
             {
                 if (bird == null) continue;
                 Vector3 vp = cam.WorldToViewportPoint(bird.transform.position);
-                
-                // Viewport check (around center of screen)
                 if (vp.z > 0 && vp.x >= 0.22f && vp.x <= 0.78f && vp.y >= 0.22f && vp.y <= 0.78f)
                 {
                     // Occlusion check
-                    RaycastHit hit;
+                    RaycastHit hitInfo;
                     Vector3 dir = bird.transform.position - cam.transform.position;
-                    if (Physics.Raycast(cam.transform.position, dir, out hit, dir.magnitude + 0.5f))
+                    if (Physics.Raycast(cam.transform.position, dir, out hitInfo, dir.magnitude + 0.5f))
                     {
-                        if (hit.transform != bird.transform && !hit.transform.IsChildOf(bird.transform))
-                        {
+                        if (hitInfo.transform != bird.transform && !hitInfo.transform.IsChildOf(bird.transform))
                             continue;
-                        }
                     }
 
                     hits++;
                     capturedThisFrame.Add(bird);
+
                     var data = bird.GetComponent<BirdDataHolder>();
-                    if (data != null && data.isSarus)
+                    if (data != null)
                     {
-                        sarusCraneCapturedAtCurrentCheckpoint = true;
+                        if (hits == 1) // chỉ lấy tên con đầu tiên cho UI
+                        {
+                            firstBirdName = data.vietnameseName;
+                            firstIsSarus  = data.isSarus;
+                        }
+                        if (data.isSarus) sarusCraneCapturedAtCurrentCheckpoint = true;
                     }
                 }
             }
 
-            if (hits > 0)
+            if (hits == 0) { isHandlingCapture = false; yield break; }
+
+            // 2. Chụp screenshot sau WaitForEndOfFrame (trước khi flash sáng trắng)
+            yield return new WaitForEndOfFrame();
+            Texture2D screenshot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+            screenshot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+            screenshot.Apply();
+
+            // Kích hoạt hiệu ứng flash + âm thanh chụp
+            if (photoCamera != null)
             {
-                birdsCapturedAtCurrentCheckpoint += hits;
-                foreach (var b in capturedThisFrame)
-                {
-                    activeBirds.Remove(b);
-                    Destroy(b);
-                }
-
-                UpdateObjectiveText($"Checkpoint {currentCheckpoint}: Chụp ảnh đàn chim ({birdsCapturedAtCurrentCheckpoint}/3)");
-
-                if (birdsCapturedAtCurrentCheckpoint >= 3)
-                {
-                    ClearCheckpoint();
-                }
+                photoCamera.PlayShutterAndFlash();
             }
+
+            // Lưu ảnh vào PersistentGameManager
+            string category = "Phase2_Ch" + currentCheckpoint;
+            if (PersistentGameManager.Instance != null)
+                PersistentGameManager.Instance.SavePhoto(category, screenshot);
+
+            // 3. Hiển thị PhotoResultUI và chờ người chơi đóng
+            string displayName = firstIsSarus
+                ? "🦅 Sếu Đầu Đỏ"
+                : "🐦 " + firstBirdName;
+            if (hits > 1) displayName += $"  (+{hits - 1} con khác)";
+
+            string birdDesc = GetBirdDescription(firstBirdName);
+
+            bool uiClosed = false;
+            PhotoResultUI.Instance.ShowResult(screenshot, displayName, birdDesc, firstIsSarus,
+                onClose: () => uiClosed = true);
+            yield return new WaitUntil(() => uiClosed);
+
+            // 4. Xử lý logic checkpoint sau khi UI đóng
+            birdsCapturedAtCurrentCheckpoint += hits;
+            foreach (var b in capturedThisFrame)
+            {
+                activeBirds.Remove(b);
+                if (b != null) Destroy(b);
+            }
+
+            UpdateObjectiveText($"Checkpoint {currentCheckpoint}: Chụp ảnh đàn chim ({birdsCapturedAtCurrentCheckpoint}/3)");
+
+            if (birdsCapturedAtCurrentCheckpoint >= 3)
+            {
+                ClearCheckpoint();
+            }
+
+            isHandlingCapture = false;
         }
+
+        // Giữ lại để tương thích ngược nếu có code khác gọi
+        private void CheckBirdCapture()
+        {
+            StartCoroutine(BirdCaptureWithPhotoRoutine());
+        }
+
 
         private void ClearCheckpoint()
         {
@@ -438,20 +516,20 @@ namespace RungTramTraSu
 
             if (flightCoroutine != null) StopCoroutine(flightCoroutine);
 
+            // Bug 6 fix: Bật lại PhotoCamera capture khi rời bird-checkpoint mode
+            if (photoCamera != null) photoCamera.SetCaptureEnabled(true);
+
             string[] dialogueLines;
             if (sarusCraneCapturedAtCurrentCheckpoint)
             {
                 dialogueLines = new string[] {
-                    "Trời đất ơi con ơi! Con chụp dính con Sếu đầu đỏ kìa!",
-                    "Loài này cực kỳ quý hiếm luôn đó con, lâu lắm rồi ông mới thấy lại tụi nó bay về đây.",
-                    "Tấm hình này thực sự là vô giá đó con. Thôi, ông cháu mình nổ máy đi tiếp nghen!"
+                    "Trời đất ơi con ơi! Con chụp dính con Sếu đầu đỏ kìa! Loài này cực kỳ quý hiếm luôn đó con, lâu lắm rồi ông mới thấy lại tụi nó bay về đây. Tấm hình này thực sự là vô giá đó con. Thôi, ông cháu mình nổ máy đi tiếp nghen!"
                 };
             }
             else
             {
                 dialogueLines = new string[] {
-                    "Ừa giỏi quá con ơi! Chụp dính rồi kìa.",
-                    "Được 3 tấm hình đẹp rồi đó. Ông cháu mình nổ máy đi tiếp nghen."
+                    "Ừa giỏi quá con ơi! Chụp dính rồi kìa. Được mấy tấm hình đẹp rồi đó. Ông cháu mình nổ máy đi tiếp nghen."
                 };
             }
 
@@ -464,6 +542,21 @@ namespace RungTramTraSu
         public void OnPhotoQuestCompleted()
         {
             // Handled internally in CheckBirdCapture
+        }
+
+        private void OnDestroy()
+        {
+            // Bug 8 fix: Dọn dẹp khi scene unload để tránh MissingReferenceException
+            isAtCheckpoint = false;
+            isTravelling = false;
+            if (flightCoroutine != null)
+            {
+                StopCoroutine(flightCoroutine);
+                flightCoroutine = null;
+            }
+            ClearActiveBirds();
+            // Bật lại capture nếu bị tắt trước khi destroy
+            if (photoCamera != null) photoCamera.SetCaptureEnabled(true);
         }
 
         private void ReachEnd()
