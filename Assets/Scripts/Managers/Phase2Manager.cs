@@ -257,13 +257,8 @@ namespace RungTramTraSu
             }
 
             UpdateObjectiveText($"Checkpoint {number}: {instructionText} (0/3)");
-
-            string speedText = number == 1 ? "từ từ thong thả" : (number == 2 ? "bay hơi nhanh hơn chút" : "bay rất nhanh lướt qua");
-            string speciesNames = number == 1 ? "Cò trắng, Diệc xám, Cò ốc, Già đẫy" : (number == 2 ? "Vạc, Cồng cộc, Cò bợ, Trích cùi, Điêng điểng" : "Bói cá, Le le, Bìm bịp, Én");
-            
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
-                $"Tới Checkpoint {number} rồi nè con. Chim sắp sửa bay ngang qua đó con.",
-                $"Đợt này chim sẽ bay {speedText}. Có các loài: {speciesNames}.",
+                "Tới Checkpoint rồi nè con. Chim sắp sửa bay ngang qua đó con.",
                 "Con lấy máy ảnh ra sẵn đi, ngắm sẵn rồi chụp nghe!"
             });
 
@@ -528,16 +523,13 @@ namespace RungTramTraSu
             if (sarusCraneCapturedAtCurrentCheckpoint)
             {
                 dialogueLines = new string[] {
-                    "Trời đất ơi con ơi! Con chụp dính con Sếu đầu đỏ kìa!",
-                    "Loài này cực kỳ quý hiếm luôn đó con, lâu lắm rồi ông mới thấy lại tụi nó bay về đây.",
-                    "Tấm hình này thực sự là vô giá đó con. Thôi, ông cháu mình nổ máy đi tiếp nghen!"
+                    "Trời đất ơi con ơi! Con chụp dính con Sếu đầu đỏ kìa! Loài này cực kỳ quý hiếm luôn đó con, lâu lắm rồi ông mới thấy lại tụi nó bay về đây. Tấm hình này thực sự là vô giá đó con. Thôi, ông cháu mình nổ máy đi tiếp nghen!"
                 };
             }
             else
             {
                 dialogueLines = new string[] {
-                    "Ừa giỏi quá con ơi! Chụp dính rồi kìa.",
-                    "Được 3 tấm hình đẹp rồi đó. Ông cháu mình nổ máy đi tiếp nghen."
+                    "Ừa giỏi quá con ơi! Chụp dính rồi kìa. Được mấy tấm hình đẹp rồi đó. Ông cháu mình nổ máy đi tiếp nghen."
                 };
             }
 

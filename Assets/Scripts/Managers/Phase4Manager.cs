@@ -108,10 +108,11 @@ namespace RungTramTraSu
         {
             yield return new WaitForSeconds(2.0f);
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
-                "Tới khu đầm lầy bảo tồn rồi nè con. Vùng này chim chóc với động vật hoang dã cư ngụ nhiều dữ lắm.",
+                "Tới khu đầm lầy bảo tồn rồi nè con.",
+                "Vùng này chim chóc với động vật hoang dã cư ngụ nhiều dữ lắm.",
                 "Hồi xưa sếu đầu đỏ tụi nó về nghẹt đất luôn, giờ thiên nhiên thay đổi nên hiếm dần rồi.",
-                "Con đi nhẹ nhàng thôi nhen, khom khom cúi người xuống (nhấn phím C để Crouch) đi chậm cho tụi chim không bị giật mình bay mất.",
-                "Con thử tìm rồi chụp đủ 5 loài động vật hoang dã khác nhau coi được không nha con!"
+                "Con đi nhẹ nhàng thôi nhen, khom khom cúi người xuống đi chậm cho tụi chim không bị giật mình bay mất.",
+                "Con thử tìm rồi chụp đủ năm loài động vật hoang dã khác nhau coi được không nha con!"
             });
         }
 
@@ -204,7 +205,7 @@ namespace RungTramTraSu
             if (controller != null) controller.SetFrozen(true);
 
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
-                "Con chụp khéo quá! Chụp được đủ hết 5 loài sinh vật quý giá của rừng mình rồi đó.",
+                "Con chụp khéo quá! Chụp được đủ hết năm loài sinh vật quý giá của rừng mình rồi đó.",
                 "Cảnh hoàng hôn sắp buông xuống rồi kìa con ơi, trời chuyển màu nhanh lắm.",
                 "Đi, hai ông cháu mình lên đỉnh tháp quan sát đằng kia ngắm toàn cảnh rừng tràm lúc chiều tà nghen."
             }, () => {
@@ -232,8 +233,16 @@ namespace RungTramTraSu
             if (storkWarningCooldown <= 0f && !capturedAnimals.Contains(type))
             {
                 storkWarningCooldown = 8f; // Cooldown
-                string name = GetAnimalVietnameseName(type);
-                StartCoroutine(ShowTemporaryWarning($"Ông Ngoại kêu: \"Con đi mạnh chân quá làm {name} giật mình trốn mất rồi kìa! Nhấn phím C để Crouch (cúi người) đi rón rén thôi con!\"", 5f));
+                StartCoroutine(ShowTemporaryWarning("Ông Ngoại kêu: \"Con đi mạnh chân quá làm tụi nó giật mình trốn mất rồi kìa! Đi rón rén thôi con!\"", 5f));
+
+                // Phát lồng tiếng cảnh báo dậm chân làm động vật biến mất (Câu 30)
+                AudioClip clip = Resources.Load<AudioClip>("Audio/Phase4/Câu thoại 30");
+                if (clip != null)
+                {
+                    AudioSource audio = GetComponent<AudioSource>();
+                    if (audio == null) audio = gameObject.AddComponent<AudioSource>();
+                    audio.PlayOneShot(clip);
+                }
             }
         }
 
@@ -266,8 +275,7 @@ namespace RungTramTraSu
             {
                 case AnimalAI.AnimalType.Stork:
                     return new string[] {
-                        "Ồ! Tấm hình cò trắng đậu trên cành tràm đẹp quá con ơi.",
-                        "Loài cò này nhát lắm, con phải đi khom người rón rén mới chụp được tụi nó đó."
+                        "Ồ! Tấm hình cò trắng đậu trên cành tràm đẹp quá con ơi. Loài cò này nhát lắm, con phải đi khom người rón rén mới chụp được tụi nó đó."
                     };
                 case AnimalAI.AnimalType.Snake:
                     return new string[] {

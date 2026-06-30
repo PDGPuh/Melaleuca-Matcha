@@ -30,12 +30,11 @@ namespace RungTramTraSu
 
         private string[] craneStoryDialogue = new string[]
         {
-            "Nước trôi lững lờ mát mẻ quá con há. Khúc này rừng tràm rập rạp và hoang sơ nhất đó.",
+            "Nước trôi lững lờ mát mẻ quá con há. Khúc này rừng tràm rậm rạp và hoang sơ nhất đó.",
             "Kìa, con nhìn chốt gác kiểm lâm cao nghệu bên phải kìa. Mùa khô các chú kiểm lâm trực trên đó để canh lửa rừng và bảo vệ chim sếu đó.",
             "Còn bên trái đằng kia là nhà sàn đầm lầy của mấy chú gác rừng đêm, có bến xuồng nhỏ xinh ghê chưa.",
-            "Con ngước nhìn mấy vệt nắng (God Rays) chiếu xiên qua kẽ lá kìa, đẹp y chang tranh vẽ vậy.",
-            "Hồi ngoại còn nhỏ bằng con, vùng đất này sếu đầu đỏ tụi nó về nhiều vô số kể.",
-            "Sếu đầu đỏ là loài chim quý lắm, cao kiêu sa, sải cánh rộng nhảy múa trên thảm bèo xanh mướt.",
+            "Con ngước nhìn mấy vệt nắng chiếu xiên qua kẽ lá kìa, đẹp y chang tranh vẽ vậy.",
+            "Hồi ngoại còn nhỏ bằng con, vùng đất này sếu đầu đỏ tụi nó về nhiều vô số kể. Sếu đầu đỏ là loài chim quý lắm, cao kiêu sa, sải cánh rộng nhảy múa trên thảm bèo xanh mướt.",
             "Tiếc là sau này thiên nhiên thay đổi, tụi nó hiếm dần rồi bỏ đi mất tăm...",
             "Ngoại mong rừng tràm mình giữ được nét hoang sơ này, để một ngày nào đó đàn sếu lại bay về mái nhà xưa."
         };

@@ -57,8 +57,13 @@ namespace RungTramTraSu
                 }
             }
 
-            // Synthesize shutter sound if null
-            if (shutterSound == null)
+            // Load Tiếng_camera_2 dynamically
+            AudioClip cameraSound = Resources.Load<AudioClip>("Audio/SFX/Tiếng_camera_2");
+            if (cameraSound != null)
+            {
+                shutterSound = cameraSound;
+            }
+            else if (shutterSound == null)
             {
                 shutterSound = CreateSyntheticShutterSound();
             }
