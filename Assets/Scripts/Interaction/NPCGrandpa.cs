@@ -66,7 +66,15 @@ namespace RungTramTraSu
             Phase1Manager manager = Phase1Manager.Instance;
             if (manager == null)
             {
-                Debug.LogWarning("Không tìm thấy Phase1Manager. Không thể kích hoạt thoại!");
+                // Check if Phase 5 is active
+                var phase5 = Phase5Manager.Instance;
+                if (phase5 != null)
+                {
+                    phase5.StartClimaxDialogue();
+                    return;
+                }
+
+                Debug.LogWarning("Không tìm thấy Phase1Manager hoặc Phase5Manager. Không thể kích hoạt thoại!");
                 return;
             }
 

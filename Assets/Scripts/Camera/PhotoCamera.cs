@@ -29,9 +29,9 @@ namespace RungTramTraSu
 
         private bool hasCamera = false;
         private bool isZooming = false;
-        private float targetFOV;
         private bool isTakingPhoto = false;
         private string currentPhotoCategory = "General";
+
         // Khi false, PhotoCamera sẽ không chụp ảnh (dùng cho Phase2 bird-checkpoint mode)
         private bool captureEnabled = true;
         // Thông tin chủ thể được set bởi Phase Manager trước khi chụp
@@ -57,13 +57,8 @@ namespace RungTramTraSu
                 }
             }
 
-            // Load Tiếng_camera_2 dynamically
-            AudioClip cameraSound = Resources.Load<AudioClip>("Audio/SFX/Tiếng_camera_2");
-            if (cameraSound != null)
-            {
-                shutterSound = cameraSound;
-            }
-            else if (shutterSound == null)
+            // Synthesize shutter sound if null
+            if (shutterSound == null)
             {
                 shutterSound = CreateSyntheticShutterSound();
             }
@@ -224,7 +219,7 @@ namespace RungTramTraSu
             // WaitForEndOfFrame đảm bảo frame hiện tại render xong mới ReadPixels
             yield return new WaitForEndOfFrame();
 
-            int width  = Screen.width;
+            int width = Screen.width;
             int height = Screen.height;
             Texture2D capturedTex = new Texture2D(width, height, TextureFormat.RGB24, false);
             capturedTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
@@ -261,11 +256,6 @@ namespace RungTramTraSu
             PhotoResultUI.Instance.ShowResult(capturedTex, displayName, displayDesc);
         }
 
-
-        /// <summary>
-        /// Kiểm tra mục tiêu quest có trong viewport không.
-        /// Trả về true nếu chụp thành công.
-        /// </summary>
         private bool ValidatePhotoContent()
         {
             if (questTarget == null) return false;
@@ -285,26 +275,33 @@ namespace RungTramTraSu
             // Chuyển vị trí mục tiêu từ tọa độ World sang Viewport của Camera
             Vector3 viewportPoint = playerCamera.WorldToViewportPoint(targetPosition);
 
-            bool isVisible = viewportPoint.z > 0 &&
-                             viewportPoint.x >= 0.2f && viewportPoint.x <= 0.8f &&
+            // Kiểm tra xem mục tiêu:
+            // - Có nằm ở phía trước camera hay không (z > 0)
+            // - Có nằm trong phạm vi hiển thị màn hình hay không (x, y từ 0.0 đến 1.0)
+            // - Để ảnh đẹp, yêu cầu mục tiêu nằm ở vùng trung tâm (x, y từ 0.2 đến 0.8)
+            bool isVisible = viewportPoint.z > 0 && 
+                             viewportPoint.x >= 0.2f && viewportPoint.x <= 0.8f && 
                              viewportPoint.y >= 0.2f && viewportPoint.y <= 0.8f;
 
             if (isVisible)
             {
-                // Kiểm tra occlusion
-                RaycastHit hit;
-                Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
-                if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit,
-                                    directionToTarget.magnitude + 1f, occlusionLayers))
+                // Kiểm tra xem mục tiêu có bị vật cản (như tường, nhà) che mất không (Bỏ qua đối với SunsetQuestTarget)
+                if (questTarget.name != "SunsetQuestTarget")
                 {
-                    if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
+                    RaycastHit hit;
+                    Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
+                    if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit, directionToTarget.magnitude + 1f, occlusionLayers))
                     {
-                        Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
-                        return false;
+                        // Nếu va chạm trúng vật khác trước mục tiêu
+                        if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
+                        {
+                            Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
+                            return false; // Bị che khuất
+                        }
                     }
                 }
 
-                // Chụp ảnh thành công! Báo về Phase Managers
+                // Chụp ảnh thành công! Báo về Phase1Manager
                 Debug.Log("Chụp ảnh mục tiêu thành công!");
                 if (Phase1Manager.Instance != null) Phase1Manager.Instance.OnPhotoQuestCompleted();
                 if (Phase2Manager.Instance != null) Phase2Manager.Instance.OnPhotoQuestCompleted();
@@ -315,7 +312,7 @@ namespace RungTramTraSu
             }
             else
             {
-                Debug.Log("Mục tiêu nằm ngoài tầm ngắm trung tâm. Viewport: " + viewportPoint);
+                Debug.Log("Mục tiêu nằm ngoài tầm ngắm trung tâm. Tọa độ Viewport: " + viewportPoint);
                 return false;
             }
         }
