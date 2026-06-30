@@ -12,6 +12,16 @@ namespace RungTramTraSu
         [SerializeField] private float crouchSpeed = 1.5f;
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float jumpForce = 5.0f;
+        [SerializeField] private float groundedStickForce = -4.0f;
+        [SerializeField] private float airGravityMultiplier = 1.65f;
+        [SerializeField] private float terminalFallSpeed = -28.0f;
+
+        [Header("Grounding")]
+        [SerializeField] private bool snapToGroundOnStart = true;
+        [SerializeField] private float groundSnapProbeHeight = 3.0f;
+        [SerializeField] private float groundSnapProbeDistance = 8.0f;
+        [SerializeField] private float groundSnapOffset = 0.05f;
+        [SerializeField] private float groundProbeDistance = 0.35f;
 
         [Header("Camera Settings")]
         [SerializeField] private Transform playerCamera;
@@ -91,6 +101,12 @@ namespace RungTramTraSu
 
         private void Start()
         {
+            if (snapToGroundOnStart)
+            {
+                SnapToGroundIfNeeded();
+            }
+
+            moveDirection.y = groundedStickForce;
             // Khóa chuột vào tâm màn hình
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -98,34 +114,8 @@ namespace RungTramTraSu
 
         private void Update()
         {
-            // Update water level from deformer if present
-            if (WaterWaveDeformer.Instance != null)
-            {
-                waterSurfaceY = WaterWaveDeformer.Instance.GetWaveHeight(transform.position.x, transform.position.z);
-            }
-            else
-            {
-                waterSurfaceY = -1.0f;
-            }
-
-            // Handle entering/exiting swimming states
             bool wasSwimming = isSwimming;
-            if (isSwimming)
-            {
-                // Exit conditions: jumped/climbed high out of water, or walking onto shallow bank (wading in water depth < 1.0m)
-                if (transform.position.y > waterSurfaceY + 0.25f || (characterController.isGrounded && transform.position.y > waterSurfaceY - 1.0f))
-                {
-                    isSwimming = false;
-                }
-            }
-            else
-            {
-                // Enter conditions: must be deep enough in water (depth > 1.2m)
-                if (transform.position.y < waterSurfaceY - 1.2f)
-                {
-                    isSwimming = true;
-                }
-            }
+            UpdateWaterState();
 
             // Handle splash triggers and crouch resets on entry
             if (isSwimming && !wasSwimming)
@@ -151,9 +141,9 @@ namespace RungTramTraSu
             if (isFrozen)
             {
                 // Áp dụng trọng lực ngay cả khi đứng im
-                if (characterController != null && characterController.enabled && !characterController.isGrounded)
+                if (characterController != null && characterController.enabled && !IsGroundedOrNearGround())
                 {
-                    moveDirection.y += gravity * Time.deltaTime;
+                    moveDirection.y = Mathf.Max(moveDirection.y + gravity * airGravityMultiplier * Time.deltaTime, terminalFallSpeed);
                     characterController.Move(moveDirection * Time.deltaTime);
                 }
                 return;
@@ -166,9 +156,9 @@ namespace RungTramTraSu
             else
             {
                 // Áp dụng trọng lực khi khóa di chuyển (nếu CharacterController bật)
-                if (characterController != null && characterController.enabled && !characterController.isGrounded)
+                if (characterController != null && characterController.enabled && !IsGroundedOrNearGround())
                 {
-                    moveDirection = new Vector3(0, gravity, 0);
+                    moveDirection = new Vector3(0, Mathf.Max(moveDirection.y + gravity * airGravityMultiplier * Time.deltaTime, terminalFallSpeed), 0);
                     characterController.Move(moveDirection * Time.deltaTime);
                 }
             }
@@ -270,7 +260,8 @@ namespace RungTramTraSu
                 bool jumpPressed = jumpAction != null && jumpAction.triggered;
 
                 // Áp dụng trọng lực và nhảy
-                if (characterController.isGrounded)
+                bool isGrounded = IsGroundedOrNearGround();
+                if (isGrounded)
                 {
                     if (jumpPressed)
                     {
@@ -287,17 +278,114 @@ namespace RungTramTraSu
                     }
                     else
                     {
-                        moveDirection.y = -0.5f; // Giữ nhân vật bám đất
+                        moveDirection.y = groundedStickForce; // Keep the controller planted on uneven terrain.
                     }
                 }
                 else
                 {
-                    moveDirection.y = movementDirectionY + (gravity * Time.deltaTime);
+                    moveDirection.y = Mathf.Max(movementDirectionY + (gravity * airGravityMultiplier * Time.deltaTime), terminalFallSpeed);
                 }
 
                 // Di chuyển CharacterController
                 characterController.Move(moveDirection * Time.deltaTime);
             }
+        }
+
+        private void UpdateWaterState()
+        {
+            if (WaterWaveDeformer.Instance == null)
+            {
+                waterSurfaceY = -1.0f;
+                isSwimming = false;
+                swimVerticalVelocity = 0f;
+                return;
+            }
+
+            waterSurfaceY = WaterWaveDeformer.Instance.GetWaveHeight(transform.position.x, transform.position.z);
+
+            bool nearWalkableGround = IsGroundedOrNearGround();
+            float feetY = GetControllerFeetY();
+            float waterDepthAtFeet = waterSurfaceY - feetY;
+
+            if (isSwimming)
+            {
+                if (transform.position.y > waterSurfaceY + 0.25f || (nearWalkableGround && waterDepthAtFeet < 1.0f))
+                {
+                    isSwimming = false;
+                    swimVerticalVelocity = 0f;
+                }
+            }
+            else if (!nearWalkableGround && waterDepthAtFeet > 1.2f)
+            {
+                isSwimming = true;
+            }
+        }
+
+        private float GetControllerFeetY()
+        {
+            if (characterController == null)
+            {
+                return transform.position.y;
+            }
+
+            return transform.position.y + characterController.center.y - characterController.height * 0.5f;
+        }
+
+        private bool IsGroundedOrNearGround()
+        {
+            if (characterController != null && characterController.isGrounded)
+            {
+                return true;
+            }
+
+            RaycastHit hit;
+            return TryFindGround(out hit, 0.2f, groundProbeDistance);
+        }
+
+        private void SnapToGroundIfNeeded()
+        {
+            RaycastHit hit;
+            if (!TryFindGround(out hit, groundSnapProbeHeight, groundSnapProbeDistance))
+            {
+                return;
+            }
+
+            float feetY = GetControllerFeetY();
+            float targetFeetY = hit.point.y + groundSnapOffset;
+            float deltaY = targetFeetY - feetY;
+
+            if (Mathf.Abs(deltaY) > 0.05f && Mathf.Abs(deltaY) <= groundSnapProbeDistance)
+            {
+                transform.position += Vector3.up * deltaY;
+            }
+        }
+
+        private bool TryFindGround(out RaycastHit bestHit, float probeHeight, float probeDistance)
+        {
+            bestHit = new RaycastHit();
+
+            Vector3 origin = transform.position;
+            origin.y = GetControllerFeetY() + probeHeight;
+
+            RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, probeHeight + probeDistance, ~0, QueryTriggerInteraction.Ignore);
+            if (hits == null || hits.Length == 0)
+            {
+                return false;
+            }
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider hitCollider = hits[i].collider;
+                if (hitCollider == null) continue;
+                if (hitCollider.transform == transform || hitCollider.transform.IsChildOf(transform)) continue;
+                if (hits[i].normal.y < 0.45f) continue;
+
+                bestHit = hits[i];
+                return true;
+            }
+
+            return false;
         }
 
         private void HandleMouseLook()
@@ -312,6 +400,16 @@ namespace RungTramTraSu
             verticalRotation -= lookInput.y * mouseSensitivity;
             verticalRotation = Mathf.Clamp(verticalRotation, lowerLookLimit, upperLookLimit);
 
+            if (playerCamera != null)
+            {
+                playerCamera.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
+            }
+        }
+
+        public void ForceSetLookRotation(Quaternion bodyRotation, float cameraPitch)
+        {
+            transform.rotation = bodyRotation;
+            verticalRotation = cameraPitch;
             if (playerCamera != null)
             {
                 playerCamera.localRotation = Quaternion.Euler(verticalRotation, 0, 0);

@@ -255,16 +255,19 @@ namespace RungTramTraSu
 
             if (isVisible)
             {
-                // Kiểm tra xem mục tiêu có bị vật cản (như tường, nhà) che mất không
-                RaycastHit hit;
-                Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
-                if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit, directionToTarget.magnitude + 1f, occlusionLayers))
+                // Kiểm tra xem mục tiêu có bị vật cản (như tường, nhà) che mất không (Bỏ qua đối với SunsetQuestTarget)
+                if (questTarget.name != "SunsetQuestTarget")
                 {
-                    // Nếu va chạm trúng vật khác trước mục tiêu
-                    if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
+                    RaycastHit hit;
+                    Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
+                    if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit, directionToTarget.magnitude + 1f, occlusionLayers))
                     {
-                        Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
-                        return; // Bị che khuất
+                        // Nếu va chạm trúng vật khác trước mục tiêu
+                        if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
+                        {
+                            Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
+                            return; // Bị che khuất
+                        }
                     }
                 }
 

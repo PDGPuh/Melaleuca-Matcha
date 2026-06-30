@@ -68,7 +68,15 @@ namespace RungTramTraSu
             Phase1Manager manager = Phase1Manager.Instance;
             if (manager == null)
             {
-                Debug.LogWarning("Không tìm thấy Phase1Manager. Không thể kích hoạt thoại!");
+                // Check if Phase 5 is active
+                var phase5 = Phase5Manager.Instance;
+                if (phase5 != null)
+                {
+                    phase5.StartClimaxDialogue();
+                    return;
+                }
+
+                Debug.LogWarning("Không tìm thấy Phase1Manager hoặc Phase5Manager. Không thể kích hoạt thoại!");
                 return;
             }
 
@@ -112,8 +120,9 @@ namespace RungTramTraSu
             // Start in idle state
             SetAnimation(false, false);
 
-            // Tự động đưa Ông Ngoại lên thuyền nếu đang ở cảnh Phase 2
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Phase2_Canal")
+            // Tự động đưa Ông Ngoại lên thuyền nếu đang ở cảnh Phase 2 hoặc Phase 3
+            string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (sceneName == "Phase2_Canal" || sceneName == "Phase3_BambooBridge")
             {
                 GameObject boatObj = GameObject.Find("Sampan Boat");
                 if (boatObj != null)

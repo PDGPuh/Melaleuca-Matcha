@@ -24,6 +24,10 @@ namespace RungTramTraSu
         [SerializeField] private TextMeshProUGUI objectiveText;
         [SerializeField] private PhotoCamera photoCamera;
         [SerializeField] private Transform sunsetTarget;
+        [SerializeField] private AudioClip climaxMusic;
+        [SerializeField] private AudioSource musicSource;
+        [SerializeField] private UnityEngine.Video.VideoClip outroVideo;
+        [SerializeField] private UnityEngine.Video.VideoPlayer videoPlayer;
 
         [Header("Diary UI References")]
         [SerializeField] private GameObject diaryCanvas;
@@ -75,7 +79,7 @@ namespace RungTramTraSu
             }
 
             // Set topHeight matching the new deck surface height
-            topHeight = 10.75f;
+            topHeight = 18.20f;
 
             // Setup beautiful runtime fog settings
             RenderSettings.fog = true;
@@ -128,6 +132,7 @@ namespace RungTramTraSu
             }
 
             UpdateObjectiveText("Mục tiêu: Leo lên đỉnh tháp quan sát để ngắm hoàng hôn cùng Ông Ngoại.");
+            ApplySunsetLighting(0f);
         }
 
         private void OnDestroy()
@@ -140,20 +145,7 @@ namespace RungTramTraSu
 
         private void Update()
         {
-            if (player == null) return;
-
-            float currentY = player.position.y;
-
-            // Lerp skybox, fog and lighting color based on player height
-            float progress = Mathf.Clamp01((currentY - startHeight) / (topHeight - startHeight));
-            ApplySunsetLighting(progress);
-
-            // Trigger climax dialogue when player gets close to the top and grandpa
-            if (!dialogueTriggered && currentY >= topHeight - 1.5f && grandpa != null && Vector3.Distance(player.position, grandpa.position) < 5.0f)
-            {
-                dialogueTriggered = true;
-                StartCoroutine(SunsetClimaxRoutine());
-            }
+            // Lighting and dialogue are triggered via player interaction with Grandpa
         }
 
         private void ApplySunsetLighting(float progress)
@@ -179,6 +171,26 @@ namespace RungTramTraSu
             }
         }
 
+        public void StartClimaxDialogue()
+        {
+            if (dialogueTriggered) return;
+            dialogueTriggered = true;
+            StartCoroutine(SunsetClimaxRoutine());
+        }
+
+        private IEnumerator SmoothTransitionToSunset(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / duration);
+                ApplySunsetLighting(progress);
+                yield return null;
+            }
+            ApplySunsetLighting(1f);
+        }
+
         private IEnumerator SunsetClimaxRoutine()
         {
             // Close player diary if it is open to avoid UI overlapping with dialogue
@@ -189,6 +201,35 @@ namespace RungTramTraSu
 
             var controller = player != null ? player.GetComponent<PlayerController>() : FindAnyObjectByType<PlayerController>();
             if (controller != null) controller.SetFrozen(true);
+
+            // Smoothly rotate player and tilt camera up to face sunset
+            if (controller != null && sunsetTarget != null)
+            {
+                StartCoroutine(SmoothRotatePlayerToSunset(controller, sunsetTarget.position, 2.5f));
+            }
+
+            // Smoothly transition lighting from day to sunset during the dialogue (over 12 seconds)
+            StartCoroutine(SmoothTransitionToSunset(12.0f));
+
+            // Play climax background music (Hoang_Hon_Toc_Bac.mp3)
+            if (musicSource != null && climaxMusic != null)
+            {
+                musicSource.clip = climaxMusic;
+                musicSource.loop = true;
+                musicSource.volume = 0.5f;
+                musicSource.Play();
+                Debug.Log("[SunsetClimaxRoutine] Started playing climax background music.");
+            }
+
+            Debug.Log($"[SunsetClimaxRoutine] Started. grandpa={grandpa != null}");
+            // Trigger pointing animation towards sunset
+            var grandpaAnim = grandpa != null ? grandpa.GetComponent<GrandpaPhase4Animator>() : null;
+            Debug.Log($"[SunsetClimaxRoutine] grandpaAnim={grandpaAnim != null}");
+            if (grandpaAnim != null)
+            {
+                Debug.Log("[SunsetClimaxRoutine] Calling PlayPointAtWildlife(99f)");
+                grandpaAnim.PlayPointAtWildlife(99f);
+            }
 
             string[] climax = new string[] {
                 "Đẹp hông con? Ông sống ở đây mấy chục năm, chiều chiều leo lên đây dòm vẫn thấy nó đẹp y chang lần đầu.",
@@ -202,6 +243,14 @@ namespace RungTramTraSu
             });
 
             yield return new WaitUntil(() => dialogueDone);
+
+            // Revert back to standing idle observe
+            if (grandpaAnim != null)
+            {
+                Debug.Log("[SunsetClimaxRoutine] Dialogue done, reverting to IdleObserve");
+                grandpaAnim.PlayIdleObserve(99f);
+            }
+
             if (controller != null) controller.SetFrozen(false);
 
             if (photoCamera != null)
@@ -211,6 +260,36 @@ namespace RungTramTraSu
             }
 
             UpdateObjectiveText("Mục tiêu: Chụp ảnh Hoàng hôn rực rỡ toàn cảnh Rừng Tràm (chuột phải để ngắm, trái để chụp).");
+        }
+
+        private IEnumerator SmoothRotatePlayerToSunset(PlayerController controller, Vector3 sunsetPos, float duration)
+        {
+            float elapsed = 0f;
+            Quaternion startBodyRot = controller.transform.rotation;
+
+            Vector3 lookDir = (sunsetPos - controller.transform.position);
+            lookDir.y = 0;
+            Quaternion targetBodyRot = Quaternion.LookRotation(lookDir.normalized);
+
+            float startPitch = Camera.main != null ? Camera.main.transform.localEulerAngles.x : 0f;
+            if (startPitch > 180f) startPitch -= 360f;
+
+            // Look slightly up towards the sky (-12f) to frame the transition beautiful
+            float targetPitch = -12.0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+                Quaternion currentBodyRot = Quaternion.Slerp(startBodyRot, targetBodyRot, t);
+                float currentPitch = Mathf.Lerp(startPitch, targetPitch, t);
+
+                controller.ForceSetLookRotation(currentBodyRot, currentPitch);
+                yield return null;
+            }
+
+            controller.ForceSetLookRotation(targetBodyRot, targetPitch);
         }
 
         public void OnPhotoQuestCompleted()
@@ -233,9 +312,22 @@ namespace RungTramTraSu
                 if (controller != null) controller.SetFrozen(true);
             }
 
+            // Stop other ambient sounds
+            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
+            if (ambientWind != null) ambientWind.Stop();
+            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
+            if (ambientRiver != null) ambientRiver.Stop();
+
+            // Stop the climax music
+            if (musicSource != null)
+            {
+                musicSource.Stop();
+            }
+
             // Fade to black (wait 2s regardless so the transition feels smooth)
             if (ScreenFader.Instance != null)
             {
+                ScreenFader.Instance.StartFadeOut(2.0f, null);
                 float elapsed = 0f;
                 while (elapsed < 2.0f)
                 {
@@ -246,6 +338,68 @@ namespace RungTramTraSu
             else
             {
                 yield return new WaitForSeconds(2.0f);
+            }
+
+            // Play the outro video clip
+            if (videoPlayer == null)
+            {
+                videoPlayer = gameObject.GetComponent<UnityEngine.Video.VideoPlayer>();
+                if (videoPlayer == null)
+                {
+                    videoPlayer = gameObject.AddComponent<UnityEngine.Video.VideoPlayer>();
+                }
+            }
+
+            if (videoPlayer != null && outroVideo != null)
+            {
+                videoPlayer.source = UnityEngine.Video.VideoSource.VideoClip;
+                videoPlayer.clip = outroVideo;
+                videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.CameraNearPlane;
+                videoPlayer.targetCamera = Camera.main;
+                videoPlayer.aspectRatio = UnityEngine.Video.VideoAspectRatio.FitInside;
+                
+                // Set playOnAwake and loop to false
+                videoPlayer.playOnAwake = false;
+                videoPlayer.isLooping = false;
+
+                // Prepare
+                videoPlayer.Prepare();
+                Debug.Log("[EndingSequenceRoutine] Preparing outro video...");
+                while (!videoPlayer.isPrepared)
+                {
+                    yield return null;
+                }
+
+                // Play
+                videoPlayer.Play();
+                Debug.Log("[EndingSequenceRoutine] Started playing outro video.");
+
+                // Fade back in quickly so the player can actually see the video on screen (since we faded out to black before)
+                if (ScreenFader.Instance != null)
+                {
+                    ScreenFader.Instance.StartFadeIn(0.5f);
+                }
+
+                // Wait a bit to ensure isPlaying becomes true
+                yield return new WaitForSeconds(0.5f);
+
+                // Wait until the video is done playing
+                while (videoPlayer.isPlaying)
+                {
+                    yield return null;
+                }
+
+                // Fade out to black again as the video completes
+                if (ScreenFader.Instance != null)
+                {
+                    ScreenFader.Instance.StartFadeOut(1.0f, null);
+                    yield return new WaitForSeconds(1.0f);
+                }
+
+                // Stop and detach
+                videoPlayer.Stop();
+                videoPlayer.targetCamera = null;
+                Debug.Log("[EndingSequenceRoutine] Outro video finished.");
             }
 
             // Open Diary UI
@@ -268,9 +422,31 @@ namespace RungTramTraSu
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
+            // Stop other ambient sounds
+            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
+            if (ambientWind != null) ambientWind.Stop();
+            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
+            if (ambientRiver != null) ambientRiver.Stop();
+
+            // Play the outro background music
+            if (musicSource != null && climaxMusic != null)
+            {
+                musicSource.clip = climaxMusic;
+                musicSource.loop = true;
+                musicSource.volume = 0.55f;
+                musicSource.Play();
+                Debug.Log("[OpenDiaryUI] Started playing outro background music: Hoang_Hon_Toc_Bac");
+            }
+
             if (diaryCanvas != null)
             {
                 diaryCanvas.SetActive(true);
+
+                // Fade back in to reveal the diary UI after the post-video fade-out
+                if (ScreenFader.Instance != null)
+                {
+                    ScreenFader.Instance.StartFadeIn(1.0f);
+                }
 
                 // Populate photos
                 if (PersistentGameManager.Instance != null && polaroidImages != null)

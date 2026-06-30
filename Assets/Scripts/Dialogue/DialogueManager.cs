@@ -30,7 +30,7 @@ namespace RungTramTraSu
         {
             Instance = this;
 
-            sentences = new Queue<string>();
+            EnsureSentenceQueue();
 
             // Tự động tìm kiếm và gán các trường UI nếu chưa được liên kết
             if (dialoguePanel == null)
@@ -99,6 +99,8 @@ namespace RungTramTraSu
         /// <param name="onComplete">Callback chạy sau khi thoại xong</param>
         public void ShowDialogue(string speaker, string[] lines, Action onComplete = null)
         {
+            EnsureSentenceQueue();
+
             if (dialoguePanel == null)
             {
                 Debug.LogWarning("Dialogue Panel chưa được gán trong Inspector!");
@@ -121,6 +123,14 @@ namespace RungTramTraSu
             dialoguePanel.SetActive(true);
 
             DisplayNextSentence();
+        }
+
+        private void EnsureSentenceQueue()
+        {
+            if (sentences == null)
+            {
+                sentences = new Queue<string>();
+            }
         }
 
         private void DisplayNextSentence()

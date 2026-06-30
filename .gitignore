@@ -11,6 +11,10 @@
 /[Mm]emory[Cc]aptures/
 /[Uu]ser[Ss]ettings/
 
+# Unity auto-generated crash recovery
+/[Aa]ssets/_Recovery.meta
+/[Aa]ssets/_[Rr]ecovery/
+
 # Large assets exceeding GitHub limits
 /Assets/Proxy Games/Stylized Nature Kit Lite/Misc/HDRI.hdr
 

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using TMPro;
 using UnityEngine.InputSystem;
@@ -17,8 +18,19 @@ namespace RungTramTraSu
         [SerializeField] private List<AnimalAI> animals = new List<AnimalAI>();
 
         private Camera playerCamera;
+        private GrandpaPhase4Animator grandpaAnimator;
         private HashSet<AnimalAI.AnimalType> capturedAnimals = new HashSet<AnimalAI.AnimalType>();
+        private readonly AnimalAI.AnimalType[] guidanceOrder = new AnimalAI.AnimalType[]
+        {
+            AnimalAI.AnimalType.Stork,
+            AnimalAI.AnimalType.Duck,
+            AnimalAI.AnimalType.Fish,
+            AnimalAI.AnimalType.Butterfly,
+            AnimalAI.AnimalType.Snake
+        };
         private bool transitionTriggered = false;
+        private bool showingTemporaryMessage = false;
+        private float objectiveRefreshTimer = 0f;
         private float storkWarningCooldown = 0f;
 
         private void Awake()
@@ -30,6 +42,8 @@ namespace RungTramTraSu
         private void Start()
         {
             playerCamera = Camera.main;
+            grandpaAnimator = FindAnyObjectByType<GrandpaPhase4Animator>();
+            PrepareObjectiveText();
 
             // Auto find player if null
             if (player == null)
@@ -40,11 +54,13 @@ namespace RungTramTraSu
 
             // Setup beautiful runtime environment settings (fog and lighting)
             RenderSettings.fog = true;
-            RenderSettings.fogColor = new Color(0.55f, 0.74f, 0.68f); // Soft green-blue swamp fog
+            RenderSettings.fogColor = new Color(0.56f, 0.66f, 0.59f); // Soft green-grey swamp haze
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.02f; // Deeper swamp fog
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = 1.25f;
+            RenderSettings.fogDensity = 0.0065f; // Keep sun shafts readable without drowning the scene
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.48f, 0.56f, 0.58f);
+            RenderSettings.ambientEquatorColor = new Color(0.36f, 0.43f, 0.33f);
+            RenderSettings.ambientGroundColor = new Color(0.15f, 0.18f, 0.12f);
 
             // Snap flying foliage and rocks to the organic terrain at runtime using raycasting
             int groundLayers = LayerMask.GetMask("Default", "Terrain");
@@ -107,12 +123,27 @@ namespace RungTramTraSu
         private IEnumerator IntroTalk()
         {
             yield return new WaitForSeconds(2.0f);
+            if (grandpaAnimator != null)
+            {
+                grandpaAnimator.PlayCrouchWhisper(99f); // Keep crouching during dialogue
+            }
+
+            bool dialogueDone = false;
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
                 "Tới khu đầm lầy bảo tồn rồi nè con. Vùng này chim chóc với động vật hoang dã cư ngụ nhiều dữ lắm.",
                 "Hồi xưa sếu đầu đỏ tụi nó về nghẹt đất luôn, giờ thiên nhiên thay đổi nên hiếm dần rồi.",
                 "Con đi nhẹ nhàng thôi nhen, khom khom cúi người xuống (nhấn phím C để Crouch) đi chậm cho tụi chim không bị giật mình bay mất.",
                 "Con thử tìm rồi chụp đủ 5 loài động vật hoang dã khác nhau coi được không nha con!"
+            }, () => {
+                dialogueDone = true;
             });
+
+            yield return new WaitUntil(() => dialogueDone);
+
+            if (grandpaAnimator != null)
+            {
+                grandpaAnimator.PlayIdleObserve(4f); // Stand back up
+            }
         }
 
         private void Update()
@@ -120,6 +151,15 @@ namespace RungTramTraSu
             if (transitionTriggered) return;
 
             if (storkWarningCooldown > 0f) storkWarningCooldown -= Time.deltaTime;
+            if (!showingTemporaryMessage)
+            {
+                objectiveRefreshTimer += Time.deltaTime;
+                if (objectiveRefreshTimer >= 1.25f)
+                {
+                    objectiveRefreshTimer = 0f;
+                    UpdateObjective();
+                }
+            }
 
             // Check if player took a photo
             if (Mouse.current.leftButton.wasPressedThisFrame && playerCamera != null)
@@ -162,6 +202,11 @@ namespace RungTramTraSu
             // Reset category to General if no valid animal was captured this frame
             if (photoCamera != null)
                 photoCamera.SetPhotoCategory("General");
+
+            if (!showingTemporaryMessage)
+            {
+                StartCoroutine(ShowTemporaryWarning("Trong khung chưa có sinh vật rõ. " + BuildCurrentHintSentence(), 4f));
+            }
         }
 
         private IEnumerator RegisterCapture(AnimalAI.AnimalType type)
@@ -180,6 +225,18 @@ namespace RungTramTraSu
             if (controller != null) controller.SetFrozen(true);
 
             string[] comment = GetGrandpaComment(type);
+            if (grandpaAnimator != null)
+            {
+                if (type == AnimalAI.AnimalType.Stork || type == AnimalAI.AnimalType.Duck)
+                {
+                    grandpaAnimator.PlayPointAtWildlife(5.5f);
+                }
+                else
+                {
+                    grandpaAnimator.PlayPhotoComment(5.5f);
+                }
+            }
+
             bool dialogueDone = false;
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", comment, () => {
                 dialogueDone = true;
@@ -202,6 +259,10 @@ namespace RungTramTraSu
             
             var controller = player.GetComponent<PlayerController>();
             if (controller != null) controller.SetFrozen(true);
+            if (grandpaAnimator != null)
+            {
+                grandpaAnimator.PlayWalkGuide(7f);
+            }
 
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
                 "Con chụp khéo quá! Chụp được đủ hết 5 loài sinh vật quý giá của rừng mình rồi đó.",
@@ -239,12 +300,14 @@ namespace RungTramTraSu
 
         private IEnumerator ShowTemporaryWarning(string warning, float duration)
         {
-            string oldObjective = objectiveText.text;
+            if (objectiveText == null) yield break;
+            showingTemporaryMessage = true;
             objectiveText.text = warning;
             objectiveText.color = Color.yellow;
             yield return new WaitForSeconds(duration);
-            objectiveText.text = oldObjective;
+            showingTemporaryMessage = false;
             objectiveText.color = Color.white;
+            UpdateObjective();
         }
 
         private string GetAnimalVietnameseName(AnimalAI.AnimalType type)
@@ -290,11 +353,177 @@ namespace RungTramTraSu
             }
         }
 
+        private void PrepareObjectiveText()
+        {
+            if (objectiveText == null) return;
+
+            objectiveText.enableWordWrapping = true;
+            objectiveText.overflowMode = TextOverflowModes.Overflow;
+            objectiveText.fontSize = Mathf.Min(objectiveText.fontSize, 15f);
+            objectiveText.lineSpacing = -18f;
+            objectiveText.alignment = TextAlignmentOptions.TopLeft;
+            objectiveText.color = new Color(1f, 1f, 1f, 0.88f);
+            objectiveText.outlineWidth = 0.18f;
+            objectiveText.outlineColor = new Color(0f, 0f, 0f, 0.65f);
+
+            RectTransform rect = objectiveText.rectTransform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(18f, -18f);
+            rect.sizeDelta = new Vector2(460f, 52f);
+        }
+
+        private string BuildChecklistLine()
+        {
+            StringBuilder builder = new StringBuilder(128);
+            for (int i = 0; i < guidanceOrder.Length; i++)
+            {
+                AnimalAI.AnimalType type = guidanceOrder[i];
+                builder.Append(capturedAnimals.Contains(type) ? "[x] " : "[ ] ");
+                builder.Append(GetShortAnimalName(type));
+                if (i < guidanceOrder.Length - 1)
+                {
+                    builder.Append(" | ");
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private string BuildCurrentHintSentence()
+        {
+            if (capturedAnimals.Count >= 5)
+            {
+                return "Đủ ảnh rồi, quay lại gặp ông.";
+            }
+
+            AnimalAI.AnimalType targetType = GetNextTargetType();
+            AnimalAI target = FindNearestAnimalOfType(targetType);
+            string direction = target != null ? GetDirectionHint(target.transform.position) : "ven bờ";
+            return $"Gợi ý: {GetHabitatHint(targetType)}, {direction}.";
+        }
+
+        private AnimalAI.AnimalType GetNextTargetType()
+        {
+            for (int i = 0; i < guidanceOrder.Length; i++)
+            {
+                if (!capturedAnimals.Contains(guidanceOrder[i]))
+                {
+                    return guidanceOrder[i];
+                }
+            }
+
+            return guidanceOrder[0];
+        }
+
+        private AnimalAI FindNearestAnimalOfType(AnimalAI.AnimalType type)
+        {
+            AnimalAI best = null;
+            float bestDistance = float.MaxValue;
+            Vector3 origin = player != null ? player.position : Vector3.zero;
+
+            for (int i = 0; i < animals.Count; i++)
+            {
+                AnimalAI animal = animals[i];
+                if (animal == null || animal.Type != type || animal.HasFled) continue;
+
+                float distance = (animal.transform.position - origin).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = animal;
+                }
+            }
+
+            return best;
+        }
+
+        private string GetDirectionHint(Vector3 worldPosition)
+        {
+            if (player == null)
+            {
+                return "ven bờ";
+            }
+
+            Vector3 toTarget = worldPosition - player.position;
+            toTarget.y = 0f;
+            float distance = toTarget.magnitude;
+            if (distance < 0.1f)
+            {
+                return "rất gần";
+            }
+
+            Vector3 direction = toTarget.normalized;
+            Vector3 forward = player.forward;
+            forward.y = 0f;
+            forward.Normalize();
+            Vector3 right = player.right;
+            right.y = 0f;
+            right.Normalize();
+
+            float forwardDot = Vector3.Dot(forward, direction);
+            float rightDot = Vector3.Dot(right, direction);
+            string side;
+
+            if (forwardDot > 0.65f)
+            {
+                side = "trước";
+            }
+            else if (forwardDot < -0.65f)
+            {
+                side = "sau";
+            }
+            else if (rightDot > 0f)
+            {
+                side = "phải";
+            }
+            else
+            {
+                side = "trái";
+            }
+
+            return $"{side} {Mathf.RoundToInt(distance)}m";
+        }
+
+        private string GetShortAnimalName(AnimalAI.AnimalType type)
+        {
+            switch (type)
+            {
+                case AnimalAI.AnimalType.Stork: return "Cò";
+                case AnimalAI.AnimalType.Snake: return "Rắn";
+                case AnimalAI.AnimalType.Fish: return "Cá";
+                case AnimalAI.AnimalType.Butterfly: return "Bướm";
+                case AnimalAI.AnimalType.Duck: return "Vịt";
+                default: return "Sinh vật";
+            }
+        }
+
+        private string GetHabitatHint(AnimalAI.AnimalType type)
+        {
+            switch (type)
+            {
+                case AnimalAI.AnimalType.Stork:
+                    return "cành tràm ven sông";
+                case AnimalAI.AnimalType.Duck:
+                    return "mặt nước yên";
+                case AnimalAI.AnimalType.Fish:
+                    return "chỗ có gợn nước";
+                case AnimalAI.AnimalType.Butterfly:
+                    return "cụm hoa súng";
+                case AnimalAI.AnimalType.Snake:
+                    return "bờ bùn, khúc cây mục";
+                default:
+                    return "ven bờ";
+            }
+        }
+
         private void UpdateObjective()
         {
             if (objectiveText == null) return;
-            objectiveText.text = $"Mục tiêu: Chụp ảnh 5 loài động vật ({capturedAnimals.Count}/5).\n" +
-                                 "Nhấn C để Crouch tiếp cận chim cò không bay mất.";
+            AnimalAI.AnimalType targetType = GetNextTargetType();
+            objectiveText.text = $"Ảnh {capturedAnimals.Count}/5 | Tìm: {GetAnimalVietnameseName(targetType)}\n" +
+                                 BuildCurrentHintSentence();
         }
 
         public void OnPhotoQuestCompleted()
