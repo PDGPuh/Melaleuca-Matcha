@@ -35,7 +35,7 @@ namespace RungTramTraSu
         // Khi false, PhotoCamera sẽ không chụp ảnh (dùng cho Phase2 bird-checkpoint mode)
         private bool captureEnabled = true;
         // Thông tin chủ thể được set bởi Phase Manager trước khi chụp
-        private string currentSubjectName = "Phống cảnh";
+        private string currentSubjectName = "Phong cảnh";
         private string currentSubjectDescription = "Một khoảnh khắc đẹp của rừng tràm miền Tây.";
 
         public bool HasCamera => hasCamera;
@@ -215,8 +215,10 @@ namespace RungTramTraSu
         {
             isTakingPhoto = true;
 
-            // ── Bước 1: Ẩn UI viewfinder trước khi chụp ──────────────────────────────
+            // ── Bước 1: Ẩn UI viewfinder và GameUI (HUD/Mục tiêu) trước khi chụp ────────
             if (viewfinderCanvas != null) viewfinderCanvas.SetActive(false);
+            GameObject gameUI = GameObject.Find("GameUI");
+            if (gameUI != null) gameUI.SetActive(false);
 
             // ── Bước 2: Chụp screenshot NGAY ĐẦU (trước khi flash bật) ──────────────
             // WaitForEndOfFrame đảm bảo frame hiện tại render xong mới ReadPixels
@@ -228,11 +230,12 @@ namespace RungTramTraSu
             capturedTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
             capturedTex.Apply();
 
+            // Khôi phục lại GameUI và viewfinder
+            if (gameUI != null) gameUI.SetActive(true);
+            if (isZooming && viewfinderCanvas != null) viewfinderCanvas.SetActive(true);
+
             // ── Bước 3: Phát âm thanh shutter + flash (sau khi đã chụp) ─────────────
             PlayShutterAndFlash();
-
-            // Khôi phục viewfinder nếu vẫn đang zoom
-            if (isZooming && viewfinderCanvas != null) viewfinderCanvas.SetActive(true);
 
             // ── Bước 4: Lưu ảnh ──────────────────────────────────────────────────────
             if (PersistentGameManager.Instance != null)

@@ -311,7 +311,8 @@ namespace RungTramTraSu
 
                 // Add BirdDataHolder for metadata and Sarus Crane detection
                 var birdInfoHolder = bird.AddComponent<BirdDataHolder>();
-                birdInfoHolder.vietnameseName = prefabName.Replace("lb_", "").Replace("HQ", "");
+                string engName = prefabName.Replace("lb_", "").Replace("HQ", "");
+                birdInfoHolder.vietnameseName = TranslateToLocalBird(engName);
                 
                 // 15% chance to spawn a Sarus Crane representation (scaled up)
                 if (i == 0 && Random.value < 0.15f)
@@ -337,6 +338,19 @@ namespace RungTramTraSu
                 if (bird != null) Destroy(bird);
             }
             activeBirds.Clear();
+        }
+
+        private string TranslateToLocalBird(string engName)
+        {
+            switch (engName)
+            {
+                case "robin": return "Cò bợ";
+                case "sparrow": return "Bìm bịp";
+                case "goldFinch": return "Le le";
+                case "blueJay": return "Cồng cộc";
+                case "cardinal": return "Vạc";
+                default: return "Chim hoang dã";
+            }
         }
 
         private IEnumerator FlightRoutine(float speed, float zCenter)
@@ -452,13 +466,18 @@ namespace RungTramTraSu
                 }
             }
 
-            if (hits == 0) { isHandlingCapture = false; yield break; }
+            // Ẩn HUD GameUI để không bị dính chữ mục tiêu vào ảnh chụp
+            GameObject gameUI = GameObject.Find("GameUI");
+            if (gameUI != null) gameUI.SetActive(false);
 
             // 2. Chụp screenshot sau WaitForEndOfFrame (trước khi flash sáng trắng)
             yield return new WaitForEndOfFrame();
             Texture2D screenshot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             screenshot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
             screenshot.Apply();
+
+            // Khôi phục HUD GameUI
+            if (gameUI != null) gameUI.SetActive(true);
 
             // Kích hoạt hiệu ứng flash + âm thanh chụp
             if (photoCamera != null)
@@ -471,32 +490,38 @@ namespace RungTramTraSu
             if (PersistentGameManager.Instance != null)
                 PersistentGameManager.Instance.SavePhoto(category, screenshot);
 
-            // 3. Hiển thị PhotoResultUI và chờ người chơi đóng
-            string displayName = firstIsSarus
-                ? "🦅 Sếu Đầu Đỏ"
-                : "🐦 " + firstBirdName;
-            if (hits > 1) displayName += $"  (+{hits - 1} con khác)";
-
-            string birdDesc = GetBirdDescription(firstBirdName);
+            // 3. Thiết lập thông tin và hiển thị PhotoResultUI (đã loại bỏ các emoji để tránh hiển thị ký tự ô vuông lỗi)
+            string displayName = "Không rõ chủ thể";
+            string birdDesc = "Mục tiêu không nằm trong khung ngắm trung tâm. Thử lại nhé!";
+            
+            if (hits > 0)
+            {
+                displayName = firstIsSarus ? "Sếu đầu đỏ" : firstBirdName;
+                if (hits > 1) displayName += $" (+{hits - 1} con khác)";
+                birdDesc = GetBirdDescription(firstBirdName);
+            }
 
             bool uiClosed = false;
             PhotoResultUI.Instance.ShowResult(screenshot, displayName, birdDesc, firstIsSarus,
                 onClose: () => uiClosed = true);
             yield return new WaitUntil(() => uiClosed);
 
-            // 4. Xử lý logic checkpoint sau khi UI đóng
-            birdsCapturedAtCurrentCheckpoint += hits;
-            foreach (var b in capturedThisFrame)
+            // 4. Xử lý logic checkpoint sau khi UI đóng (chỉ cộng điểm nếu chụp trúng)
+            if (hits > 0)
             {
-                activeBirds.Remove(b);
-                if (b != null) Destroy(b);
-            }
+                birdsCapturedAtCurrentCheckpoint += hits;
+                foreach (var b in capturedThisFrame)
+                {
+                    activeBirds.Remove(b);
+                    if (b != null) Destroy(b);
+                }
 
-            UpdateObjectiveText($"Checkpoint {currentCheckpoint}: Chụp ảnh đàn chim ({birdsCapturedAtCurrentCheckpoint}/3)");
+                UpdateObjectiveText($"Checkpoint {currentCheckpoint}: Chụp ảnh đàn chim ({birdsCapturedAtCurrentCheckpoint}/3)");
 
-            if (birdsCapturedAtCurrentCheckpoint >= 3)
-            {
-                ClearCheckpoint();
+                if (birdsCapturedAtCurrentCheckpoint >= 3)
+                {
+                    ClearCheckpoint();
+                }
             }
 
             isHandlingCapture = false;

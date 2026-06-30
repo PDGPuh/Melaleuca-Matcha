@@ -124,7 +124,7 @@ namespace RungTramTraSu
                 {
                     transform.SetParent(boatObj.transform, false);
                     transform.localScale = new Vector3(0.85f / 5f, 0.85f / 5f, 0.85f / 5f);
-                    transform.localPosition = new Vector3(0.3f, 0.06f, 0f);
+                    transform.localPosition = new Vector3(0.37f, 0.06f, 0.08f);
                     transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
                 }
             }
@@ -284,6 +284,13 @@ namespace RungTramTraSu
             leftOar = new GameObject("ProceduralOar_L");
             leftOar.transform.SetParent(leftHand, false);
             leftOar.transform.localPosition = Vector3.zero;
+            // Compensate for bone scale to keep oar at world scale 1
+            Vector3 handScaleL = leftHand.lossyScale;
+            leftOar.transform.localScale = new Vector3(
+                handScaleL.x > 0 ? 1f / handScaleL.x : 1f,
+                handScaleL.y > 0 ? 1f / handScaleL.y : 1f,
+                handScaleL.z > 0 ? 1f / handScaleL.z : 1f
+            );
             // Left oar points to the left (-X) and down
             leftOar.transform.localRotation = Quaternion.Euler(0f, -90f, -30f);
 
@@ -307,6 +314,13 @@ namespace RungTramTraSu
             rightOar = new GameObject("ProceduralOar_R");
             rightOar.transform.SetParent(rightHand, false);
             rightOar.transform.localPosition = Vector3.zero;
+            // Compensate for bone scale to keep oar at world scale 1
+            Vector3 handScaleR = rightHand.lossyScale;
+            rightOar.transform.localScale = new Vector3(
+                handScaleR.x > 0 ? 1f / handScaleR.x : 1f,
+                handScaleR.y > 0 ? 1f / handScaleR.y : 1f,
+                handScaleR.z > 0 ? 1f / handScaleR.z : 1f
+            );
             // Right oar points to the right (+X) and down
             rightOar.transform.localRotation = Quaternion.Euler(0f, 90f, 30f);
 
@@ -346,16 +360,8 @@ namespace RungTramTraSu
 
                 wasOnBoat = true;
 
-                // 1. Lower hips to make him sit on the bench of the boat
-                hips.localPosition = new Vector3(-0.06f, 38.0f, 1.31f);
-
-                // 2. Rotate upper legs forward/up
-                leftUpLeg.localRotation = Quaternion.Euler(-75f, 0f, 0f);
-                rightUpLeg.localRotation = Quaternion.Euler(-75f, 0f, 0f);
-
-                // 3. Rotate lower legs backward/down
-                leftLeg.localRotation = Quaternion.Euler(80f, 0f, 0f);
-                rightLeg.localRotation = Quaternion.Euler(80f, 0f, 0f);
+                // 1. Grandpa stands on the boat to row (characteristic of Western Vietnam)
+                // Hips and legs remain in their natural standing positions from the Idle animation.
 
                 // 4. Animate rowing motion using a sine wave
                 float time = Time.time * 2.0f; // Speed of rowing
@@ -365,11 +371,11 @@ namespace RungTramTraSu
                 float spineAngle = 20f + wave * 10f;
                 if (spine != null) spine.localRotation = Quaternion.Euler(spineAngle, 0f, 0f);
 
-                // Arms reach forward
-                float leftArmY = -60f - wave * 20f;
-                float rightArmY = 60f + wave * 20f;
-                if (leftArm != null) leftArm.localRotation = Quaternion.Euler(0f, leftArmY, 25f + wave * 10f);
-                if (rightArm != null) rightArm.localRotation = Quaternion.Euler(0f, rightArmY, -25f - wave * 10f);
+                // Arms reach forward (fixed axis swap: swing is on Z, tilt is on Y)
+                float leftArmZ = -65f - wave * 15f;
+                float rightArmZ = 65f + wave * 15f;
+                if (leftArm != null) leftArm.localRotation = Quaternion.Euler(0f, 25f, leftArmZ);
+                if (rightArm != null) rightArm.localRotation = Quaternion.Euler(0f, -25f, rightArmZ);
 
                 // Elbows (Forearms) bend/extend slightly in sync
                 float leftForeArmY = -40f + wave * 15f;
