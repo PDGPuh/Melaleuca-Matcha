@@ -34,22 +34,20 @@ namespace RungTramTraSu
             "Mà nè, ông ngoại có cái này cho con...",
             "Đây là chiếc máy ảnh phim cũ của ông hồi xưa. Con giữ lấy đi.",
             "Đi chơi rừng đẹp lắm, con cầm máy theo chụp lại làm kỷ niệm.",
-            "Nè, con thử cầm lên, bấm chuột phải để ngắm ngốc rồi chụp thử cây xoài to đằng kia cho ông xem coi có hoạt động tốt không nha!"
+            "Nè, con thử cầm lên, bấm chuột phải để ngắm góc rồi chụp thử cây xoài to đằng kia cho ông xem coi có hoạt động tốt không nha!"
         };
 
         [SerializeField]
         private string[] waitingForPhotoDialogue = new string[]
         {
-            "Con cứ từ từ thử xem. Nhấn chuột phải để ngắm (Zoom) và click chuột trái để chụp cây xoài to đằng kia kìa.",
-            "Thử chụp một tấm đẹp đẹp cho ông coi thử coi."
+            "Con cứ từ từ thử xem. Nhấn chuột phải để ngắm và click chuột trái để chụp cây xoài to đằng kia kìa. Thử chụp một tấm đẹp đẹp cho ông coi thử coi."
         };
 
         [SerializeField]
         private string[] photoTakenDialogue = new string[]
         {
             "Đâu, đưa ông coi tấm hình thử... Ừa! Đẹp lắm con, máy ảnh cũ vậy chứ chụp vẫn bén ngót hà.",
-            "Thôi, chuẩn bị đồ đạc rồi hai ông cháu mình xuống xuồng đi con. Đứng đây nắng lên nóng lắm.",
-            "Bước xuống chiếc xuồng dưới bến nước kia kìa, ông chèo đưa đi."
+            "Thôi, chuẩn bị đồ đạc rồi hai ông cháu mình xuống xuồng đi con. Đứng đây nắng lên nóng lắm. Bước xuống chiếc xuồng dưới bến nước kia kìa, ông chèo đưa đi."
         };
 
         [SerializeField]
