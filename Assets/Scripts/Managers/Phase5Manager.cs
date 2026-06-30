@@ -47,6 +47,11 @@ namespace RungTramTraSu
         {
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
+
+            if (GetComponent<EndingDiaryController>() == null)
+            {
+                gameObject.AddComponent<EndingDiaryController>();
+            }
         }
 
         private void Start()
@@ -233,125 +238,80 @@ namespace RungTramTraSu
                 if (controller != null) controller.SetFrozen(true);
             }
 
-            // Fade to black (wait 2s regardless so the transition feels smooth)
-            if (ScreenFader.Instance != null)
+            // Populate photos
+            if (PersistentGameManager.Instance != null && polaroidImages != null)
             {
-                float elapsed = 0f;
-                while (elapsed < 2.0f)
+                for (int i = 0; i < polaroidImages.Length; i++)
                 {
-                    elapsed += Time.deltaTime;
-                    yield return null;
+                    Texture2D tex = null;
+                    if (i == 0)
+                    {
+                        tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
+                    }
+                    else if (i == 1)
+                    {
+                        tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                    }
+                    else if (i == 2)
+                    {
+                        tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                    }
+                    else if (i == 3)
+                    {
+                        // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
+                        tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
+                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
+                    }
+                    else if (i == 4)
+                    {
+                        tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
+                    }
+
+                    if (polaroidImages[i] != null)
+                    {
+                        if (tex != null)
+                        {
+                            polaroidImages[i].texture = tex;
+                            polaroidImages[i].color = Color.white;
+                        }
+                        else
+                        {
+                            polaroidImages[i].texture = null;
+                            polaroidImages[i].color = Color.gray;
+                        }
+                    }
                 }
+            }
+
+            // Setup restart button listener
+            if (replayButton != null)
+            {
+                replayButton.onClick.RemoveAllListeners();
+                replayButton.onClick.AddListener(ReplayGame);
+            }
+
+            // Start Ending Sequence through EndingDiaryController
+            var diaryController = EndingDiaryController.Instance;
+            if (diaryController != null && diaryCanvas != null)
+            {
+                RectTransform bgRect = diaryText != null ? diaryText.transform.parent.GetComponent<RectTransform>() : null;
+                diaryController.StartEndingSequence(diaryCanvas, bgRect, diaryText, polaroidImages, replayButton);
             }
             else
             {
-                yield return new WaitForSeconds(2.0f);
-            }
-
-            // Open Diary UI
-            OpenDiaryUI();
-
-            // --- Fallback: if diaryCanvas is not assigned in Inspector, show a simple message ---
-            if (diaryCanvas == null)
-            {
+                // Fallback: if diaryCanvas is not assigned in Inspector, show a simple message
                 UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 yield return new WaitForSeconds(5f);
                 SceneManager.LoadScene("Phase1_GrandpaHouse");
-            }
-        }
-
-        private void OpenDiaryUI()
-        {
-            // Unlock mouse cursor for UI interaction
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-
-            if (diaryCanvas != null)
-            {
-                diaryCanvas.SetActive(true);
-
-                // Populate photos
-                if (PersistentGameManager.Instance != null && polaroidImages != null)
-                {
-                    for (int i = 0; i < polaroidImages.Length; i++)
-                    {
-                        Texture2D tex = null;
-                        if (i == 0)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
-                        }
-                        else if (i == 1)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                        }
-                        else if (i == 2)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                        }
-                        else if (i == 3)
-                        {
-                            // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
-                        }
-                        else if (i == 4)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
-                        }
-
-                        if (polaroidImages[i] != null)
-                        {
-                            if (tex != null)
-                            {
-                                polaroidImages[i].texture = tex;
-                                polaroidImages[i].color = Color.white;
-                            }
-                            else
-                            {
-                                polaroidImages[i].texture = null;
-                                polaroidImages[i].color = Color.gray;
-                            }
-                        }
-                    }
-                }
-
-                // Typewriter diary text
-                StartCoroutine(TypewriterDiaryText());
-
-                // Set up restart button
-                if (replayButton != null)
-                {
-                    replayButton.onClick.RemoveAllListeners();
-                    replayButton.onClick.AddListener(ReplayGame);
-                }
-            }
-        }
-
-        private IEnumerator TypewriterDiaryText()
-        {
-            if (diaryText == null) yield break;
-
-            string fullText = "Cuốn sổ lưu niệm: Chuyến đi rừng tràm Trà Sư cùng Ông Ngoại...\n\n" +
-                              "\"Mình chưa từng nghĩ quê hương An Giang lại đẹp hoang sơ và kỳ vĩ đến vậy.\n" +
-                              "Màu xanh mướt của bèo tấm, tiếng chim cò líu lo, tia nắng rực rỡ lọc qua tán lá rừng sâu...\n" +
-                              "Lời ông ngoại dặn rất đúng: Thiên nhiên non nước hữu tình của mình, nếu chúng ta không gìn giữ và yêu thương, thì một ngày nào đó tụi nó sẽ biến mất mãi mãi...\"\n\n" +
-                              "Cảm ơn bạn đã trải nghiệm trò chơi Rừng Tràm Trà Sư!\n" +
-                              "Nhóm phát triển PRU213 - Unity 6000.4.7f1";
-
-            diaryText.text = "";
-            foreach (char c in fullText.ToCharArray())
-            {
-                diaryText.text += c;
-                yield return new WaitForSeconds(0.015f);
             }
         }
 
