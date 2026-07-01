@@ -364,7 +364,7 @@ namespace RungTramTraSu
             descriptionText.fontSize = 15f;
             descriptionText.fontStyle = FontStyles.Italic;
             descriptionText.color = new Color(0.3f, 0.22f, 0.14f);
-            descriptionText.enableWordWrapping = true;
+            descriptionText.textWrappingMode = TextWrappingModes.Normal;
 
             // ── Countdown Bar (background) ──
             GameObject barBgGo = CreateRT("CountdownBarBg", card.transform,
@@ -422,7 +422,7 @@ namespace RungTramTraSu
         private Canvas FindOrCreateCanvas()
         {
             // Ưu tiên dùng Canvas có sẵn trong scene với sort order cao
-            Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            Canvas[] canvases = FindObjectsByType<Canvas>();
             Canvas best = null;
             foreach (var c in canvases)
             {

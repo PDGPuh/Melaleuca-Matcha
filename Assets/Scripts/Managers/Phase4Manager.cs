@@ -86,7 +86,7 @@ namespace RungTramTraSu
             }
 
             // Automatically find all AnimalAI objects in the scene
-            animals = new List<AnimalAI>(FindObjectsByType<AnimalAI>(FindObjectsSortMode.None));
+            animals = new List<AnimalAI>(FindObjectsByType<AnimalAI>());
             Debug.Log($"[Phase4Manager] Start: Found {animals.Count} AnimalAI objects in the scene.");
             foreach (var a in animals)
             {

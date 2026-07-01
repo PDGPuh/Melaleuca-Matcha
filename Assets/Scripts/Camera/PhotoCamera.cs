@@ -265,6 +265,23 @@ namespace RungTramTraSu
         /// </summary>
         private bool ValidatePhotoContent()
         {
+            // For Phase 5 sunset, make validation lenient: succeed if the camera is pointed towards the sky/sunset
+            string sceneName = SceneManager.GetActiveScene().name;
+            if (sceneName.Contains("Phase5"))
+            {
+                Vector3 targetPos = questTarget != null ? questTarget.position : new Vector3(35f, 16f, 120f);
+                Vector3 sunsetDir = (targetPos - playerCamera.transform.position).normalized;
+                float dot = Vector3.Dot(playerCamera.transform.forward, sunsetDir);
+                
+                // dot > 0.7f is about a 45-degree angle cone around the sunset direction
+                if (dot > 0.7f)
+                {
+                    Debug.Log("Chụp ảnh hoàng hôn thành công (Góc ngắm tự do)!");
+                    if (Phase5Manager.Instance != null) Phase5Manager.Instance.OnPhotoQuestCompleted();
+                    return true;
+                }
+            }
+
             if (questTarget == null) return false;
 
             // Determine the actual visual center of the target (using its Collider bounds center if available)

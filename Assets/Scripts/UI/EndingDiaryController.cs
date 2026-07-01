@@ -86,6 +86,7 @@ namespace RungTramTraSu
             polaroidImages = photos;
             replayButton = replayBtn;
 
+            Debug.Log($"[EndingDiary] StartEndingSequence called. canvas: {canvas?.name}, background: {background?.name}, textComp: {textComp?.name}, replayBtn: {replayBtn?.name}");
             StartCoroutine(EndingFlowRoutine());
         }
 
@@ -97,12 +98,14 @@ namespace RungTramTraSu
             // 2. Fade to black
             if (ScreenFader.Instance != null)
             {
+                Debug.Log("[EndingDiary] Fading out screen to black...");
                 bool fadeDone = false;
                 ScreenFader.Instance.StartFadeOut(2.0f, () => fadeDone = true);
                 yield return new WaitUntil(() => fadeDone);
             }
             else
             {
+                Debug.LogWarning("[EndingDiary] ScreenFader.Instance is null, waiting 2s instead.");
                 yield return new WaitForSeconds(2.0f);
             }
 
@@ -110,26 +113,69 @@ namespace RungTramTraSu
             ConfigureUI();
 
             // Enable canvas
-            if (diaryCanvas != null) diaryCanvas.SetActive(true);
+            if (diaryCanvas != null)
+            {
+                // Detach from parent to fix Unity nested CanvasScaler scaling bug
+                diaryCanvas.transform.SetParent(null, false);
+                diaryCanvas.transform.localScale = Vector3.one;
+                
+                diaryCanvas.SetActive(true);
+                
+                // Force Canvas component and GraphicRaycaster to be enabled
+                Canvas c = diaryCanvas.GetComponent<Canvas>();
+                if (c != null)
+                {
+                    c.enabled = true;
+                    c.renderMode = RenderMode.ScreenSpaceOverlay;
+                    c.sortingOrder = 998; // Render on top of gameUI (0) but below FaderCanvas (999)
+                    Debug.Log($"[EndingDiary] Canvas component enabled: {c.enabled}, renderMode: {c.renderMode}, sortingOrder: {c.sortingOrder}");
+                }
+                
+                CanvasGroup cg = diaryCanvas.GetComponent<CanvasGroup>();
+                if (cg == null) cg = diaryCanvas.AddComponent<CanvasGroup>();
+                cg.alpha = 1f;
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
+
+                // Set parent hierarchy scaling to 1 to avoid UI being scaled to zero
+                Transform curr = diaryCanvas.transform;
+                while (curr != null)
+                {
+                    curr.localScale = Vector3.one;
+                    Debug.Log($"[EndingDiary] Forced localScale of {curr.name} to Vector3.one. ActiveSelf: {curr.gameObject.activeSelf}");
+                    curr = curr.parent;
+                }
+            }
+            else
+            {
+                Debug.LogError("[EndingDiary] diaryCanvas is null!");
+            }
 
             // 4. Fade in screen back to show the diary
             if (ScreenFader.Instance != null)
             {
+                Debug.Log("[EndingDiary] Fading in screen...");
                 ScreenFader.Instance.StartFadeIn(1.5f);
             }
 
             // 5. Play music and fade it in
             if (donCaMusic != null)
             {
+                Debug.Log("[EndingDiary] Playing đờn ca tài tử music...");
                 musicSource.clip = donCaMusic;
                 musicSource.volume = 0f;
                 musicSource.Play();
                 StartCoroutine(FadeInMusic(3.0f, 0.6f));
             }
+            else
+            {
+                Debug.LogWarning("[EndingDiary] DonCaMusic audio clip not loaded!");
+            }
 
             // 6. Typewriter effect
             if (diaryText != null)
             {
+                Debug.Log("[EndingDiary] Starting typewriter diary text...");
                 diaryText.text = "";
                 yield return new WaitForSeconds(0.5f); // Pause before writing
 
@@ -151,6 +197,10 @@ namespace RungTramTraSu
                     yield return new WaitForSeconds(UnityEngine.Random.Range(0.04f, 0.06f));
                 }
             }
+            else
+            {
+                Debug.LogError("[EndingDiary] diaryText TextMeshPro component is null!");
+            }
 
             // 7. Silent moment
             yield return new WaitForSeconds(3.0f);
@@ -158,6 +208,7 @@ namespace RungTramTraSu
             // 8. Fade out diary panel to black
             if (bgPanel != null)
             {
+                Debug.Log("[EndingDiary] Fading out diary panel...");
                 CanvasGroup cg = bgPanel.gameObject.GetComponent<CanvasGroup>();
                 if (cg == null) cg = bgPanel.gameObject.AddComponent<CanvasGroup>();
                 
@@ -178,6 +229,7 @@ namespace RungTramTraSu
             // 9. Show Credits Panel
             if (creditPanel != null)
             {
+                Debug.Log("[EndingDiary] Showing Credit Panel...");
                 creditPanel.SetActive(true);
                 CanvasGroup ccg = creditPanel.GetComponent<CanvasGroup>();
                 if (ccg == null) ccg = creditPanel.AddComponent<CanvasGroup>();
@@ -214,6 +266,7 @@ namespace RungTramTraSu
             // 11. Show Replay Button
             if (replayButton != null)
             {
+                Debug.Log("[EndingDiary] Showing Replay Button...");
                 replayButton.gameObject.SetActive(true);
                 CanvasGroup rcg = replayButton.gameObject.GetComponent<CanvasGroup>();
                 if (rcg == null) rcg = replayButton.gameObject.AddComponent<CanvasGroup>();
@@ -237,6 +290,10 @@ namespace RungTramTraSu
         {
             if (diaryCanvas == null) return;
 
+            Debug.Log("[EndingDiary] Configuring Ending UI...");
+            // Make sure canvas scale is correct
+            diaryCanvas.transform.localScale = Vector3.one;
+
             // Faded Overlay Panel background
             Transform overlayTrans = diaryCanvas.transform.Find("FadedOverlay");
             GameObject overlayObj;
@@ -254,11 +311,25 @@ namespace RungTramTraSu
                 
                 var overlayImg = overlayObj.AddComponent<Image>();
                 overlayImg.color = new Color(0.06f, 0.04f, 0.02f, 0.9f);
+                Debug.Log("[EndingDiary] Created FadedOverlay object.");
+            }
+            else
+            {
+                overlayObj = overlayTrans.gameObject;
+                overlayObj.SetActive(true);
             }
 
             // Style notebook background panel to be centered
             if (bgPanel != null)
             {
+                bgPanel.gameObject.SetActive(true);
+                bgPanel.transform.localScale = Vector3.one;
+
+                // Reset CanvasGroup if present
+                CanvasGroup cg = bgPanel.GetComponent<CanvasGroup>();
+                if (cg == null) cg = bgPanel.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 1f;
+
                 bgPanel.anchorMin = new Vector2(0.5f, 0.5f);
                 bgPanel.anchorMax = new Vector2(0.5f, 0.5f);
                 bgPanel.pivot = new Vector2(0.5f, 0.5f);
@@ -277,6 +348,11 @@ namespace RungTramTraSu
                 if (customFont != null && diaryText != null)
                 {
                     diaryText.font = customFont;
+                    Debug.Log($"[EndingDiary] Applied custom font: {customFont.name}");
+                }
+                else
+                {
+                    Debug.LogWarning("[EndingDiary] Custom font segoepr SDF/segoesc SDF not found in Resources. Using default TMPro font.");
                 }
 
                 if (diaryText != null)
@@ -367,7 +443,7 @@ namespace RungTramTraSu
 
         private IEnumerator FadeOutAmbientSounds(float duration)
         {
-            AudioSource[] sources = FindObjectsByType<AudioSource>(FindObjectsSortMode.None);
+            AudioSource[] sources = FindObjectsByType<AudioSource>();
             float elapsed = 0f;
 
             // Store initial volumes
