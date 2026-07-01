@@ -31,6 +31,7 @@ namespace RungTramTraSu
         private bool isZooming = false;
         private bool isTakingPhoto = false;
         private string currentPhotoCategory = "General";
+        private float targetFOV;
 
         // Khi false, PhotoCamera sẽ không chụp ảnh (dùng cho Phase2 bird-checkpoint mode)
         private bool captureEnabled = true;

@@ -70,9 +70,9 @@ namespace RungTramTraSu
             // Kiểm tra click chuột trái hoặc phím Space hoặc phím Enter để tiếp tục hội thoại
             if (dialoguePanel != null && dialoguePanel.activeSelf)
             {
-                if (Mouse.current.leftButton.wasPressedThisFrame || 
-                    Keyboard.current.spaceKey.wasPressedThisFrame || 
-                    Keyboard.current.enterKey.wasPressedThisFrame)
+                bool nextInput = (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) ||
+                                 (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame));
+                if (nextInput)
                 {
                     if (isTyping)
                     {

@@ -283,7 +283,6 @@ namespace RungTramTraSu
 
                 GameObject bird = Instantiate(prefab, Vector3.zero, Quaternion.identity);
                 bird.name = "CheckpointBird_" + i;
-                bird.tag = "Interactable";
 
                 // Disable and destroy lb_Bird script to prevent it from running its own AI behavior
                 var lbBird = bird.GetComponent<lb_Bird>();
@@ -441,13 +440,26 @@ namespace RungTramTraSu
                 Vector3 vp = cam.WorldToViewportPoint(bird.transform.position);
                 if (vp.z > 0 && vp.x >= 0.22f && vp.x <= 0.78f && vp.y >= 0.22f && vp.y <= 0.78f)
                 {
-                    // Occlusion check
-                    RaycastHit hitInfo;
+                    // Occlusion check: chỉ kiểm tra xem có vật thể nào ở phía TRƯỚC che khuất con chim không
                     Vector3 dir = bird.transform.position - cam.transform.position;
-                    if (Physics.Raycast(cam.transform.position, dir, out hitInfo, dir.magnitude + 0.5f))
+                    float checkDist = dir.magnitude - 0.5f;
+                    if (checkDist > 0.5f)
                     {
-                        if (hitInfo.transform != bird.transform && !hitInfo.transform.IsChildOf(bird.transform))
-                            continue;
+                        RaycastHit[] raycastHits = Physics.RaycastAll(cam.transform.position, dir.normalized, checkDist, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                        bool isOccluded = false;
+                        foreach (var hit in raycastHits)
+                        {
+                            // Bỏ qua thuyền, người chơi, ông ngoại và các vật phẩm gắn trên thuyền
+                            if (hit.transform == boat || hit.transform.IsChildOf(boat)) continue;
+                            if (player != null && (hit.transform == player || hit.transform.IsChildOf(player))) continue;
+
+                            isOccluded = true;
+                            break;
+                        }
+                        if (isOccluded)
+                        {
+                            continue; // Có vật cản thực sự ở trước
+                        }
                     }
 
                     hits++;

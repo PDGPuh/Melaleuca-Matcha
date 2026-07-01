@@ -261,7 +261,7 @@ namespace RungTramTraSu
                 bool jumpPressed = jumpAction != null && jumpAction.triggered;
 
                 // Áp dụng trọng lực và nhảy
-                bool isGrounded = IsGroundedOrNearGround();
+                bool isGrounded = IsGroundedOrNearGround() && movementDirectionY <= 0;
                 if (isGrounded)
                 {
                     if (jumpPressed)

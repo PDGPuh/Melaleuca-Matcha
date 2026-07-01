@@ -91,7 +91,13 @@ namespace RungTramTraSu
         {
             if (panel == null)
             {
-                Debug.LogWarning("[PhotoResultUI] Panel chưa được tạo. Gọi callback ngay.");
+                Debug.Log("[PhotoResultUI] Panel is null/destroyed, rebuilding UI...");
+                BuildUI();
+            }
+
+            if (panel == null)
+            {
+                Debug.LogWarning("[PhotoResultUI] Panel chưa được tạo sau khi rebuild. Gọi callback ngay.");
                 onClose?.Invoke();
                 return;
             }
@@ -361,9 +367,9 @@ namespace RungTramTraSu
             descGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             descriptionText = descGo.AddComponent<TextMeshProUGUI>();
             descriptionText.alignment = TextAlignmentOptions.Center;
-            descriptionText.fontSize = 15f;
-            descriptionText.fontStyle = FontStyles.Italic;
-            descriptionText.color = new Color(0.3f, 0.22f, 0.14f);
+            descriptionText.fontSize = 18f;
+            descriptionText.fontStyle = FontStyles.Normal;
+            descriptionText.color = new Color(0.15f, 0.12f, 0.08f);
             descriptionText.enableWordWrapping = true;
 
             // ── Countdown Bar (background) ──
@@ -416,29 +422,23 @@ namespace RungTramTraSu
             hintGo.GetComponent<RectTransform>().pivot = Vector2.zero;
             TextMeshProUGUI hintTmp = hintGo.AddComponent<TextMeshProUGUI>();
             hintTmp.text = "Nhật ký ảnh [Tab] để xem lại";
-            hintTmp.fontSize = 12f;
-            hintTmp.color = new Color(0.5f, 0.4f, 0.3f, 0.8f);
+            hintTmp.fontSize = 15f;
+            hintTmp.fontStyle = FontStyles.Normal;
+            hintTmp.color = new Color(0.35f, 0.28f, 0.2f, 1f);
         }
 
         private Canvas FindOrCreateCanvas()
         {
-            // Ưu tiên dùng Canvas có sẵn trong scene với sort order cao
-            Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-            Canvas best = null;
-            foreach (var c in canvases)
+            // Luôn tạo Canvas chuyên dụng riêng làm con của PhotoResultUI (DontDestroyOnLoad) để tránh bị xóa khi chuyển cảnh
+            Transform existingCanvas = transform.Find("[PhotoResultCanvas]");
+            if (existingCanvas != null)
             {
-                if (c.renderMode == RenderMode.ScreenSpaceOverlay)
-                {
-                    if (best == null || c.sortingOrder > best.sortingOrder)
-                        best = c;
-                }
+                Canvas c = existingCanvas.GetComponent<Canvas>();
+                if (c != null) return c;
             }
-            if (best != null) return best;
 
-            // Tạo Canvas mới nếu không tìm thấy
             GameObject canvasGo = new GameObject("[PhotoResultCanvas]");
-            canvasGo.transform.SetParent(transform);
-            DontDestroyOnLoad(canvasGo);
+            canvasGo.transform.SetParent(transform, false);
 
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -456,9 +456,8 @@ namespace RungTramTraSu
             {
                 GameObject esGo = new GameObject("[EventSystem]");
                 esGo.transform.SetParent(transform);
-                DontDestroyOnLoad(esGo);
                 esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
 
             return canvas;
