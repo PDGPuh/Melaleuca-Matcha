@@ -1323,7 +1323,6 @@ namespace RungTramTraSu
             SetupPostProcessingAndFog(camObj);
 
             EditorSceneManager.SaveScene(newScene, "Assets/Scenes/Phase4_Sanctuary.unity");
-            SceneBeautifierAll.BeautifyPhase4();
             Debug.Log("Successfully created Phase 4 scene!");
         }
 

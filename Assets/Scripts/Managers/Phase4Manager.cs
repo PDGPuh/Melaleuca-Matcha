@@ -5,6 +5,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace RungTramTraSu
 {
@@ -176,12 +177,14 @@ namespace RungTramTraSu
         private void CheckAnimalCapture()
         {
             var photoCamera = playerCamera.GetComponent<PhotoCamera>();
+            AnimalAI.AnimalType targetType = GetNextTargetType();
 
             foreach (var animal in animals)
             {
                 if (animal == null) continue;
                 if (animal.HasFled) continue;
                 if (capturedAnimals.Contains(animal.Type)) continue;
+                if (animal.Type != targetType) continue;
 
                 Vector3 viewportPoint = playerCamera.WorldToViewportPoint(animal.transform.position);
                 bool inFrame = viewportPoint.z > 0 &&
@@ -190,6 +193,15 @@ namespace RungTramTraSu
 
                 if (inFrame)
                 {
+                    if (photoCamera != null)
+                    {
+                        photoCamera.SetQuestTarget(animal.transform);
+                        photoCamera.SetSubjectInfo(
+                            GetAnimalVietnameseName(animal.Type),
+                            $"Chủ thể: {GetAnimalVietnameseName(animal.Type)}"
+                        );
+                    }
+
                     // Set photo category dynamically based on the actual captured animal
                     if (photoCamera != null)
                         photoCamera.SetPhotoCategory("Phase4_" + animal.Type.ToString());
@@ -201,11 +213,14 @@ namespace RungTramTraSu
 
             // Reset category to General if no valid animal was captured this frame
             if (photoCamera != null)
+            {
                 photoCamera.SetPhotoCategory("General");
+                photoCamera.SetQuestTarget(null);
+            }
 
             if (!showingTemporaryMessage)
             {
-                StartCoroutine(ShowTemporaryWarning("Trong khung chưa có sinh vật rõ. " + BuildCurrentHintSentence(), 4f));
+                StartCoroutine(ShowTemporaryWarning($"Chưa thấy đúng mục tiêu {GetAnimalVietnameseName(targetType)}. " + BuildCurrentHintSentence(), 4f));
             }
         }
 
@@ -357,21 +372,54 @@ namespace RungTramTraSu
         {
             if (objectiveText == null) return;
 
+            EnsureObjectiveBackdrop();
+
             objectiveText.enableWordWrapping = true;
             objectiveText.overflowMode = TextOverflowModes.Overflow;
-            objectiveText.fontSize = Mathf.Min(objectiveText.fontSize, 15f);
-            objectiveText.lineSpacing = -18f;
+            objectiveText.fontSize = Mathf.Max(objectiveText.fontSize, 16f);
+            objectiveText.lineSpacing = -8f;
             objectiveText.alignment = TextAlignmentOptions.TopLeft;
-            objectiveText.color = new Color(1f, 1f, 1f, 0.88f);
-            objectiveText.outlineWidth = 0.18f;
-            objectiveText.outlineColor = new Color(0f, 0f, 0f, 0.65f);
+            objectiveText.color = new Color(1f, 1f, 1f, 0.96f);
+            objectiveText.outlineWidth = 0.28f;
+            objectiveText.outlineColor = new Color(0f, 0f, 0f, 0.9f);
 
             RectTransform rect = objectiveText.rectTransform;
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(0f, 1f);
             rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(18f, -18f);
-            rect.sizeDelta = new Vector2(460f, 52f);
+            rect.anchoredPosition = new Vector2(22f, -18f);
+            rect.sizeDelta = new Vector2(560f, 72f);
+        }
+
+        private void EnsureObjectiveBackdrop()
+        {
+            if (objectiveText == null) return;
+
+            Transform backdrop = objectiveText.transform.parent != null
+                ? objectiveText.transform.parent.Find("ObjectiveTextBackdrop")
+                : null;
+
+            if (backdrop == null)
+            {
+                GameObject backdropObj = new GameObject("ObjectiveTextBackdrop");
+                backdropObj.transform.SetParent(objectiveText.transform.parent, false);
+                backdropObj.transform.SetSiblingIndex(objectiveText.transform.GetSiblingIndex());
+
+                Image image = backdropObj.AddComponent<Image>();
+                image.color = new Color(0f, 0f, 0f, 0.52f);
+                image.raycastTarget = false;
+
+                RectTransform backdropRect = backdropObj.GetComponent<RectTransform>();
+                backdropRect.anchorMin = new Vector2(0f, 1f);
+                backdropRect.anchorMax = new Vector2(0f, 1f);
+                backdropRect.pivot = new Vector2(0f, 1f);
+                backdropRect.anchoredPosition = new Vector2(14f, -12f);
+                backdropRect.sizeDelta = new Vector2(576f, 84f);
+
+                backdropObj.transform.SetSiblingIndex(Mathf.Max(0, objectiveText.transform.GetSiblingIndex()));
+            }
+
+            objectiveText.transform.SetAsLastSibling();
         }
 
         private string BuildChecklistLine()

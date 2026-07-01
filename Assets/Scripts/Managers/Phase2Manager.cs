@@ -19,6 +19,7 @@ namespace RungTramTraSu
         [SerializeField] private Transform sunRayTarget;
         [SerializeField] private Transform storkTarget;
         [SerializeField] private GameObject storksFlock;
+        [SerializeField] private List<GameObject> birdPrefabs = new List<GameObject>();
 
         [Header("Movement Settings")]
         [SerializeField] private float boatSpeed = 3.5f;
@@ -277,8 +278,18 @@ namespace RungTramTraSu
 
             for (int i = 0; i < count; i++)
             {
-                string prefabName = species[Random.Range(0, species.Length)];
-                GameObject prefab = Resources.Load<GameObject>(prefabName);
+                GameObject prefab = null;
+                if (birdPrefabs != null && birdPrefabs.Count > 0)
+                {
+                    prefab = birdPrefabs[Random.Range(0, birdPrefabs.Count)];
+                }
+
+                if (prefab == null)
+                {
+                    string prefabName = species[Random.Range(0, species.Length)];
+                    prefab = Resources.Load<GameObject>(prefabName);
+                }
+
                 if (prefab == null) continue;
 
                 GameObject bird = Instantiate(prefab, Vector3.zero, Quaternion.identity);
@@ -310,8 +321,7 @@ namespace RungTramTraSu
 
                 // Add BirdDataHolder for metadata and Sarus Crane detection
                 var birdInfoHolder = bird.AddComponent<BirdDataHolder>();
-                string engName = prefabName.Replace("lb_", "").Replace("HQ", "");
-                birdInfoHolder.vietnameseName = TranslateToLocalBird(engName);
+                birdInfoHolder.vietnameseName = GetBirdNameFromPrefab(prefab);
                 
                 // 15% chance to spawn a Sarus Crane representation (scaled up)
                 if (i == 0 && Random.value < 0.15f)
@@ -350,6 +360,14 @@ namespace RungTramTraSu
                 case "cardinal": return "Vạc";
                 default: return "Chim hoang dã";
             }
+        }
+
+        private string GetBirdNameFromPrefab(GameObject prefab)
+        {
+            if (prefab == null) return "Chim hoang dã";
+
+            string engName = prefab.name.Replace("(Clone)", "").Replace("lb_", "").Replace("HQ", "");
+            return TranslateToLocalBird(engName);
         }
 
         private IEnumerator FlightRoutine(float speed, float zCenter)

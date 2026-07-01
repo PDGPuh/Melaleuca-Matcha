@@ -424,7 +424,7 @@ Shader "MapMagic/TerrainPreviewHDRP"
         UsePass "Hidden/Nature/Terrain/Utilities/PICKING"
     }
 
-    Dependency "BaseMapShader" = "Hidden/HDRP/TerrainLit_Basemap"
-    Dependency "BaseMapGenShader" = "Hidden/HDRP/TerrainLit_BasemapGen"
+    Dependency "BaseMapShader" = "MapMagic/TerrainPreviewURP"
+    Dependency "BaseMapGenShader" = "MapMagic/TerrainPreviewURP"
     CustomEditor "UnityEditor.Rendering.HighDefinition.TerrainLitGUI"
 }

@@ -259,14 +259,24 @@ namespace RungTramTraSu
 
         private bool ValidatePhotoContent()
         {
-            if (questTarget == null) return false;
+            Transform resolvedTarget = questTarget;
+
+            // Phase 4 does not always pre-assign a quest target in time for the same click.
+            // Fall back to the animal actually visible in the frame so the shot is judged
+            // by what the player photographed instead of a stale target reference.
+            if (resolvedTarget == null && IsPhase4Scene())
+            {
+                resolvedTarget = ResolveVisiblePhase4AnimalTarget();
+            }
+
+            if (resolvedTarget == null) return false;
 
             // Determine the actual visual center of the target (using its Collider bounds center if available)
-            Vector3 targetPosition = questTarget.position;
-            Collider targetCollider = questTarget.GetComponent<Collider>();
+            Vector3 targetPosition = resolvedTarget.position;
+            Collider targetCollider = resolvedTarget.GetComponent<Collider>();
             if (targetCollider == null)
             {
-                targetCollider = questTarget.GetComponentInChildren<Collider>();
+                targetCollider = resolvedTarget.GetComponentInChildren<Collider>();
             }
             if (targetCollider != null)
             {
@@ -287,14 +297,14 @@ namespace RungTramTraSu
             if (isVisible)
             {
                 // Kiểm tra xem mục tiêu có bị vật cản (như tường, nhà) che mất không (Bỏ qua đối với SunsetQuestTarget)
-                if (questTarget.name != "SunsetQuestTarget")
+                if (resolvedTarget.name != "SunsetQuestTarget")
                 {
                     RaycastHit hit;
                     Vector3 directionToTarget = targetPosition - playerCamera.transform.position;
                     if (Physics.Raycast(playerCamera.transform.position, directionToTarget, out hit, directionToTarget.magnitude + 1f, occlusionLayers))
                     {
                         // Nếu va chạm trúng vật khác trước mục tiêu
-                        if (hit.transform != questTarget && !hit.transform.IsChildOf(questTarget))
+                        if (hit.transform != resolvedTarget && !hit.transform.IsChildOf(resolvedTarget))
                         {
                             Debug.Log("Mục tiêu bị che mất bởi: " + hit.collider.name);
                             return false; // Bị che khuất
@@ -357,6 +367,55 @@ namespace RungTramTraSu
         {
             currentSubjectName = name;
             currentSubjectDescription = description;
+        }
+
+        private bool IsPhase4Scene()
+        {
+            string sceneName = SceneManager.GetActiveScene().name;
+            return sceneName.Contains("Phase4");
+        }
+
+        private Transform ResolveVisiblePhase4AnimalTarget()
+        {
+            AnimalAI[] animals = FindObjectsByType<AnimalAI>(FindObjectsSortMode.None);
+            Transform bestTarget = null;
+            float bestScore = float.MaxValue;
+
+            foreach (AnimalAI animal in animals)
+            {
+                if (animal == null || animal.HasFled) continue;
+
+                Vector3 targetPosition = animal.transform.position;
+                Collider collider = animal.GetComponent<Collider>();
+                if (collider == null)
+                {
+                    collider = animal.GetComponentInChildren<Collider>();
+                }
+
+                if (collider != null)
+                {
+                    targetPosition = collider.bounds.center;
+                }
+
+                Vector3 viewportPoint = playerCamera.WorldToViewportPoint(targetPosition);
+                bool inFrame = viewportPoint.z > 0 &&
+                               viewportPoint.x >= 0.15f && viewportPoint.x <= 0.85f &&
+                               viewportPoint.y >= 0.15f && viewportPoint.y <= 0.85f;
+
+                if (!inFrame)
+                {
+                    continue;
+                }
+
+                float centerScore = Mathf.Abs(viewportPoint.x - 0.5f) + Mathf.Abs(viewportPoint.y - 0.5f);
+                if (centerScore < bestScore)
+                {
+                    bestScore = centerScore;
+                    bestTarget = animal.transform;
+                }
+            }
+
+            return bestTarget;
         }
 
         private void UpdateDynamicCategory()

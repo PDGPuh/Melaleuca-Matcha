@@ -16,6 +16,8 @@ namespace RungTramTraSu
         private PlayerController playerController;
         private bool isFleeing = false;
         private float actionTimer = 0f;
+        [SerializeField] private float spawnGraceSeconds = 8f;
+        private float aliveTimer = 0f;
 
         // Visual feedback when scared
         private bool hasFled = false;
@@ -25,6 +27,7 @@ namespace RungTramTraSu
         private void Start()
         {
             startPos = transform.position;
+            SetVisualsEnabled(true);
             GameObject playerObj = GameObject.FindWithTag("Player");
             if (playerObj != null)
             {
@@ -37,9 +40,16 @@ namespace RungTramTraSu
 
         private void Update()
         {
+            aliveTimer += Time.deltaTime;
+
             if (isFleeing)
             {
                 // Fleeing movement is handled by FleeAndRespawnRoutine
+                return;
+            }
+
+            if (aliveTimer < spawnGraceSeconds)
+            {
                 return;
             }
 
