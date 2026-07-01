@@ -24,6 +24,10 @@ namespace RungTramTraSu
         [SerializeField] private TextMeshProUGUI objectiveText;
         [SerializeField] private PhotoCamera photoCamera;
         [SerializeField] private Transform sunsetTarget;
+        [SerializeField] private AudioClip climaxMusic;
+        [SerializeField] private AudioSource musicSource;
+        [SerializeField] private UnityEngine.Video.VideoClip outroVideo;
+        [SerializeField] private UnityEngine.Video.VideoPlayer videoPlayer;
 
         [Header("Diary UI References")]
         [SerializeField] private GameObject diaryCanvas;
@@ -80,7 +84,7 @@ namespace RungTramTraSu
             }
 
             // Set topHeight matching the new deck surface height
-            topHeight = 10.75f;
+            topHeight = 18.20f;
 
             // Setup beautiful runtime fog settings
             RenderSettings.fog = true;
@@ -133,6 +137,7 @@ namespace RungTramTraSu
             }
 
             UpdateObjectiveText("Mục tiêu: Leo lên đỉnh tháp quan sát để ngắm hoàng hôn cùng Ông Ngoại.");
+            ApplySunsetLighting(0f);
         }
 
         private void OnDestroy()
@@ -145,20 +150,7 @@ namespace RungTramTraSu
 
         private void Update()
         {
-            if (player == null) return;
-
-            float currentY = player.position.y;
-
-            // Lerp skybox, fog and lighting color based on player height
-            float progress = Mathf.Clamp01((currentY - startHeight) / (topHeight - startHeight));
-            ApplySunsetLighting(progress);
-
-            // Trigger climax dialogue when player gets close to the top and grandpa
-            if (!dialogueTriggered && currentY >= topHeight - 1.5f && grandpa != null && Vector3.Distance(player.position, grandpa.position) < 5.0f)
-            {
-                dialogueTriggered = true;
-                StartCoroutine(SunsetClimaxRoutine());
-            }
+            // Lighting and dialogue are triggered via player interaction with Grandpa
         }
 
         private void ApplySunsetLighting(float progress)
@@ -184,6 +176,26 @@ namespace RungTramTraSu
             }
         }
 
+        public void StartClimaxDialogue()
+        {
+            if (dialogueTriggered) return;
+            dialogueTriggered = true;
+            StartCoroutine(SunsetClimaxRoutine());
+        }
+
+        private IEnumerator SmoothTransitionToSunset(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / duration);
+                ApplySunsetLighting(progress);
+                yield return null;
+            }
+            ApplySunsetLighting(1f);
+        }
+
         private IEnumerator SunsetClimaxRoutine()
         {
             // Close player diary if it is open to avoid UI overlapping with dialogue
@@ -194,6 +206,35 @@ namespace RungTramTraSu
 
             var controller = player != null ? player.GetComponent<PlayerController>() : FindAnyObjectByType<PlayerController>();
             if (controller != null) controller.SetFrozen(true);
+
+            // Smoothly rotate player and tilt camera up to face sunset
+            if (controller != null && sunsetTarget != null)
+            {
+                StartCoroutine(SmoothRotatePlayerToSunset(controller, sunsetTarget.position, 2.5f));
+            }
+
+            // Smoothly transition lighting from day to sunset during the dialogue (over 12 seconds)
+            StartCoroutine(SmoothTransitionToSunset(12.0f));
+
+            // Play climax background music (Hoang_Hon_Toc_Bac.mp3)
+            if (musicSource != null && climaxMusic != null)
+            {
+                musicSource.clip = climaxMusic;
+                musicSource.loop = true;
+                musicSource.volume = 0.5f;
+                musicSource.Play();
+                Debug.Log("[SunsetClimaxRoutine] Started playing climax background music.");
+            }
+
+            Debug.Log($"[SunsetClimaxRoutine] Started. grandpa={grandpa != null}");
+            // Trigger pointing animation towards sunset
+            var grandpaAnim = grandpa != null ? grandpa.GetComponent<GrandpaPhase4Animator>() : null;
+            Debug.Log($"[SunsetClimaxRoutine] grandpaAnim={grandpaAnim != null}");
+            if (grandpaAnim != null)
+            {
+                Debug.Log("[SunsetClimaxRoutine] Calling PlayPointAtWildlife(99f)");
+                grandpaAnim.PlayPointAtWildlife(99f);
+            }
 
             string[] climax = new string[] {
                 "Đẹp hông con? Ông sống ở đây mấy chục năm, chiều chiều leo lên đây dòm vẫn thấy nó đẹp y chang lần đầu.",
@@ -207,6 +248,14 @@ namespace RungTramTraSu
             });
 
             yield return new WaitUntil(() => dialogueDone);
+
+            // Revert back to standing idle observe
+            if (grandpaAnim != null)
+            {
+                Debug.Log("[SunsetClimaxRoutine] Dialogue done, reverting to IdleObserve");
+                grandpaAnim.PlayIdleObserve(99f);
+            }
+
             if (controller != null) controller.SetFrozen(false);
 
             if (photoCamera != null)
@@ -216,6 +265,36 @@ namespace RungTramTraSu
             }
 
             UpdateObjectiveText("Mục tiêu: Chụp ảnh Hoàng hôn rực rỡ toàn cảnh Rừng Tràm (chuột phải để ngắm, trái để chụp).");
+        }
+
+        private IEnumerator SmoothRotatePlayerToSunset(PlayerController controller, Vector3 sunsetPos, float duration)
+        {
+            float elapsed = 0f;
+            Quaternion startBodyRot = controller.transform.rotation;
+
+            Vector3 lookDir = (sunsetPos - controller.transform.position);
+            lookDir.y = 0;
+            Quaternion targetBodyRot = Quaternion.LookRotation(lookDir.normalized);
+
+            float startPitch = Camera.main != null ? Camera.main.transform.localEulerAngles.x : 0f;
+            if (startPitch > 180f) startPitch -= 360f;
+
+            // Look slightly up towards the sky (-12f) to frame the transition beautiful
+            float targetPitch = -12.0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+                Quaternion currentBodyRot = Quaternion.Slerp(startBodyRot, targetBodyRot, t);
+                float currentPitch = Mathf.Lerp(startPitch, targetPitch, t);
+
+                controller.ForceSetLookRotation(currentBodyRot, currentPitch);
+                yield return null;
+            }
+
+            controller.ForceSetLookRotation(targetBodyRot, targetPitch);
         }
 
         public void OnPhotoQuestCompleted()
@@ -238,75 +317,40 @@ namespace RungTramTraSu
                 if (controller != null) controller.SetFrozen(true);
             }
 
-            // Populate photos
-            if (PersistentGameManager.Instance != null && polaroidImages != null)
+            // Stop other ambient sounds
+            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
+            if (ambientWind != null) ambientWind.Stop();
+            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
+            if (ambientRiver != null) ambientRiver.Stop();
+
+            // Stop the climax music
+            if (musicSource != null)
             {
-                for (int i = 0; i < polaroidImages.Length; i++)
+                musicSource.Stop();
+            }
+
+            // Fade to black
+            if (ScreenFader.Instance != null)
+            {
+                ScreenFader.Instance.StartFadeOut(2.0f, null);
+                float elapsed = 0f;
+                while (elapsed < 2.0f)
                 {
-                    Texture2D tex = null;
-                    if (i == 0)
-                    {
-                        tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
-                    }
-                    else if (i == 1)
-                    {
-                        tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                    }
-                    else if (i == 2)
-                    {
-                        tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                    }
-                    else if (i == 3)
-                    {
-                        // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
-                        tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
-                        if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
-                    }
-                    else if (i == 4)
-                    {
-                        tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
-                    }
-
-                    if (polaroidImages[i] != null)
-                    {
-                        if (tex != null)
-                        {
-                            polaroidImages[i].texture = tex;
-                            polaroidImages[i].color = Color.white;
-                        }
-                        else
-                        {
-                            polaroidImages[i].texture = null;
-                            polaroidImages[i].color = Color.gray;
-                        }
-                    }
+                    elapsed += Time.deltaTime;
+                    yield return null;
                 }
-            }
-
-            // Setup restart button listener
-            if (replayButton != null)
-            {
-                replayButton.onClick.RemoveAllListeners();
-                replayButton.onClick.AddListener(ReplayGame);
-            }
-
-            // Start Ending Sequence through EndingDiaryController
-            var diaryController = EndingDiaryController.Instance;
-            if (diaryController != null && diaryCanvas != null)
-            {
-                RectTransform bgRect = diaryText != null ? diaryText.transform.parent.GetComponent<RectTransform>() : null;
-                diaryController.StartEndingSequence(diaryCanvas, bgRect, diaryText, polaroidImages, replayButton);
             }
             else
             {
-                // Fallback: if diaryCanvas is not assigned in Inspector, show a simple message
+                yield return new WaitForSeconds(2.0f);
+            }
+
+            // Mở Diary UI → nhạc cải lương → credits typewriter
+            OpenDiaryUI();
+
+            // Fallback nếu không có diaryCanvas
+            if (diaryCanvas == null)
+            {
                 UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
@@ -314,6 +358,108 @@ namespace RungTramTraSu
                 SceneManager.LoadScene("Phase1_GrandpaHouse");
             }
         }
+
+        private void OpenDiaryUI()
+        {
+            // Unlock mouse cursor for UI interaction
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            // Play the outro background music (cải lương)
+            if (musicSource != null && climaxMusic != null)
+            {
+                musicSource.clip = climaxMusic;
+                musicSource.loop = true;
+                musicSource.volume = 0.55f;
+                musicSource.Play();
+            }
+
+            if (diaryCanvas != null)
+            {
+                diaryCanvas.SetActive(true);
+
+                // Fade back in to reveal the diary UI
+                if (ScreenFader.Instance != null)
+                {
+                    ScreenFader.Instance.StartFadeIn(1.0f);
+                }
+
+                // Populate photos
+                if (PersistentGameManager.Instance != null && polaroidImages != null)
+                {
+                    for (int i = 0; i < polaroidImages.Length; i++)
+                    {
+                        Texture2D tex = null;
+                        if (i == 0) tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
+                        else if (i == 1)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                        }
+                        else if (i == 2)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                        }
+                        else if (i == 3)
+                        {
+                            tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
+                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
+                        }
+                        else if (i == 4) tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
+
+                        if (polaroidImages[i] != null)
+                        {
+                            if (tex != null)
+                            {
+                                polaroidImages[i].texture = tex;
+                                polaroidImages[i].color = Color.white;
+                            }
+                            else
+                            {
+                                polaroidImages[i].texture = null;
+                                polaroidImages[i].color = Color.gray;
+                            }
+                        }
+                    }
+                }
+
+                // Typewriter diary text
+                StartCoroutine(TypewriterDiaryText());
+
+                // Set up restart button
+                if (replayButton != null)
+                {
+                    replayButton.onClick.RemoveAllListeners();
+                    replayButton.onClick.AddListener(ReplayGame);
+                }
+            }
+        }
+
+        private IEnumerator TypewriterDiaryText()
+        {
+            if (diaryText == null) yield break;
+
+            string fullText = "Cuốn sổ lưu niệm: Chuyến đi rừng tràm Trà Sư cùng Ông Ngoại...\n\n" +
+                              "\"Mình chưa từng nghĩ quê hương An Giang lại đẹp hoang sơ và kỳ vĩ đến vậy.\n" +
+                              "Màu xanh mướt của bèo tấm, tiếng chim cò líu lo, tia nắng rực rỡ lọc qua tán lá rừng sâu...\n" +
+                              "Lời ông ngoại dặn rất đúng: Thiên nhiên non nước hữu tình của mình, nếu chúng ta không gìn giữ và yêu thương, thì một ngày nào đó tụi nó sẽ biến mất mãi mãi...\"\n\n" +
+                              "Cảm ơn bạn đã trải nghiệm trò chơi Rừng Tràm Trà Sư!\n" +
+                              "Nhóm phát triển PRU213 - Unity 6000.4.7f1";
+
+            diaryText.text = "";
+            foreach (char c in fullText.ToCharArray())
+            {
+                diaryText.text += c;
+                yield return new WaitForSeconds(0.015f);
+            }
+        }
+
 
         private void ReplayGame()
         {
