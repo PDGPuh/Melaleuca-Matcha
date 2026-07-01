@@ -117,9 +117,9 @@ namespace RungTramTraSu
             if (developCoroutine != null) StopCoroutine(developCoroutine);
             developCoroutine = StartCoroutine(DevelopPhotoRoutine(subjectName, description, isRare));
 
-            // Bắt đầu đếm ngược tự đóng
-            if (autoCloseCoroutine != null) StopCoroutine(autoCloseCoroutine);
-            autoCloseCoroutine = StartCoroutine(AutoCloseRoutine());
+            // Đã loại bỏ tự động đóng theo yêu cầu:
+            // if (autoCloseCoroutine != null) StopCoroutine(autoCloseCoroutine);
+            // autoCloseCoroutine = StartCoroutine(AutoCloseRoutine());
         }
 
         /// <summary>Đóng panel thủ công (gọi từ nút hoặc phím).</summary>
@@ -336,7 +336,7 @@ namespace RungTramTraSu
                                           new Vector2(0f, -372f), new Vector2(560f, 34f));
             badgeGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             rareBadgeText = badgeGo.AddComponent<TextMeshProUGUI>();
-            rareBadgeText.text = "⭐  LOÀI QUÝ HIẾM!  ⭐";
+            rareBadgeText.text = "LOÀI QUÝ HIẾM!";
             rareBadgeText.alignment = TextAlignmentOptions.Center;
             rareBadgeText.fontSize = 20f;
             rareBadgeText.fontStyle = FontStyles.Bold;
@@ -373,6 +373,7 @@ namespace RungTramTraSu
             barBgGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0f);
             Image barBgImg = barBgGo.AddComponent<Image>();
             barBgImg.color = new Color(0.55f, 0.55f, 0.55f, 0.4f);
+            barBgGo.SetActive(false);
 
             // ── Countdown Bar (fill) ──
             GameObject barFillGo = CreateRT("CountdownBarFill", barBgGo.transform,

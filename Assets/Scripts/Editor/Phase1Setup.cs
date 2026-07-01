@@ -2042,56 +2042,144 @@ namespace RungTramTraSu
             popupRect.anchorMax = new Vector2(0.5f, 0.5f);
             popupRect.pivot = new Vector2(0.5f, 0.5f);
             popupRect.anchoredPosition = Vector2.zero;
-            popupRect.sizeDelta = new Vector2(450, 300);
+            popupRect.sizeDelta = new Vector2(580, 320);
 
             var popupBg = cameraPopupPanel.AddComponent<Image>();
-            popupBg.color = new Color(0.12f, 0.12f, 0.12f, 0.95f);
+            popupBg.color = new Color(0.08f, 0.08f, 0.10f, 0.98f);
+
+            var outline = cameraPopupPanel.AddComponent<Outline>();
+            outline.effectColor = new Color(0.85f, 0.65f, 0.15f, 0.5f);
+            outline.effectDistance = new Vector2(1.5f, 1.5f);
+
+            // --- Cột trái: icon máy ảnh ---
+            GameObject iconContainer = new GameObject("LeftColumn");
+            iconContainer.transform.SetParent(cameraPopupPanel.transform, false);
+            var iconRect2 = iconContainer.AddComponent<RectTransform>();
+            iconRect2.anchorMin = new Vector2(0f, 0f);
+            iconRect2.anchorMax = new Vector2(0.38f, 1f);
+            iconRect2.offsetMin = new Vector2(20f, 50f);
+            iconRect2.offsetMax = new Vector2(-10f, -20f);
+            iconContainer.AddComponent<Image>().color = new Color(0.05f, 0.05f, 0.07f, 0.9f);
+            var leftOutline = iconContainer.AddComponent<Outline>();
+            leftOutline.effectColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            leftOutline.effectDistance = new Vector2(1f, 1f);
+
+            // Load sprite máy ảnh
+            var camSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Textures/UI/CameraItemIcon.png");
+            if (camSprite != null) {
+                GameObject camImgObj = new GameObject("CameraImage");
+                camImgObj.transform.SetParent(iconContainer.transform, false);
+                var cImgRect = camImgObj.AddComponent<RectTransform>();
+                cImgRect.anchorMin = new Vector2(0.05f, 0.20f);
+                cImgRect.anchorMax = new Vector2(0.95f, 0.95f);
+                cImgRect.offsetMin = Vector2.zero;
+                cImgRect.offsetMax = Vector2.zero;
+                var cImg = camImgObj.AddComponent<Image>();
+                cImg.sprite = camSprite;
+                cImg.preserveAspect = true;
+            }
+
+            // Badge "VẬT PHẨM MỚI!"
+            GameObject badge = new GameObject("NewItemBadge");
+            badge.transform.SetParent(iconContainer.transform, false);
+            var badgeRect = badge.AddComponent<RectTransform>();
+            badgeRect.anchorMin = new Vector2(0f, 0f);
+            badgeRect.anchorMax = new Vector2(1f, 0f);
+            badgeRect.pivot = new Vector2(0.5f, 0f);
+            badgeRect.anchoredPosition = Vector2.zero;
+            badgeRect.sizeDelta = new Vector2(0f, 26f);
+            badge.AddComponent<Image>().color = new Color(0.85f, 0.63f, 0.05f, 1f);
+            GameObject badgeTxtObj = new GameObject("Label");
+            badgeTxtObj.transform.SetParent(badge.transform, false);
+            var btR = badgeTxtObj.AddComponent<RectTransform>();
+            btR.anchorMin = Vector2.zero; btR.anchorMax = Vector2.one; btR.sizeDelta = Vector2.zero;
+            var btT = badgeTxtObj.AddComponent<TextMeshProUGUI>();
+            btT.text = "VẬT PHẨM MỚI!";
+            btT.fontSize = 11f;
+            btT.fontStyle = FontStyles.Bold;
+            btT.color = new Color(0.05f, 0.05f, 0.05f);
+            btT.alignment = TextAlignmentOptions.Center;
+
+            // --- Cột phải: Content Container ---
+            GameObject rightCol = new GameObject("RightColumn");
+            rightCol.transform.SetParent(cameraPopupPanel.transform, false);
+            var rightRect = rightCol.AddComponent<RectTransform>();
+            rightRect.anchorMin = new Vector2(0.38f, 0f);
+            rightRect.anchorMax = new Vector2(1f, 1f);
+            rightRect.offsetMin = new Vector2(10f, 50f);
+            rightRect.offsetMax = new Vector2(-20f, -20f);
 
             // Title
             GameObject titleObj = new GameObject("TitleText");
-            titleObj.transform.SetParent(cameraPopupPanel.transform, false);
+            titleObj.transform.SetParent(rightCol.transform, false);
             var titleRect = titleObj.AddComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0.5f, 1f);
-            titleRect.anchorMax = new Vector2(0.5f, 1f);
-            titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.anchoredPosition = new Vector2(0, -25);
-            titleRect.sizeDelta = new Vector2(400, 40);
+            titleRect.anchorMin = new Vector2(0f, 0.80f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.offsetMin = Vector2.zero;
+            titleRect.offsetMax = Vector2.zero;
             var titleText = titleObj.AddComponent<TextMeshProUGUI>();
             titleText.text = "NHẬN MÁY ẢNH PHIM CŨ";
-            titleText.fontSize = 22;
+            titleText.fontSize = 18;
             titleText.fontStyle = FontStyles.Bold;
-            titleText.color = Color.yellow;
-            titleText.alignment = TextAlignmentOptions.Center;
+            titleText.color = new Color(0.95f, 0.75f, 0.1f);
+            titleText.alignment = TextAlignmentOptions.MidlineLeft;
+            titleText.enableWordWrapping = true;
+
+            // Divider Line
+            GameObject divider = new GameObject("Divider");
+            divider.transform.SetParent(rightCol.transform, false);
+            var divRect = divider.AddComponent<RectTransform>();
+            divRect.anchorMin = new Vector2(0f, 0.78f);
+            divRect.anchorMax = new Vector2(1f, 0.78f);
+            divRect.pivot = new Vector2(0.5f, 0.5f);
+            divRect.anchoredPosition = Vector2.zero;
+            divRect.sizeDelta = new Vector2(0f, 1.5f);
+            divider.AddComponent<Image>().color = new Color(0.3f, 0.3f, 0.35f, 0.5f);
 
             // Description
             GameObject descObj = new GameObject("DescText");
-            descObj.transform.SetParent(cameraPopupPanel.transform, false);
+            descObj.transform.SetParent(rightCol.transform, false);
             var descRect = descObj.AddComponent<RectTransform>();
-            descRect.anchorMin = new Vector2(0.5f, 0.5f);
-            descRect.anchorMax = new Vector2(0.5f, 0.5f);
-            descRect.pivot = new Vector2(0.5f, 0.5f);
-            descRect.anchoredPosition = new Vector2(0, -10);
-            descRect.sizeDelta = new Vector2(380, 120);
+            descRect.anchorMin = new Vector2(0f, 0f);
+            descRect.anchorMax = new Vector2(1f, 0.75f);
+            descRect.offsetMin = Vector2.zero;
+            descRect.offsetMax = new Vector2(0f, -6f);
             var descText = descObj.AddComponent<TextMeshProUGUI>();
-            descText.text = "Máy ảnh phim cũ ba mua hồi năm ngoái. Vẫn còn xài tốt nhưng ống kính hơi rít...\n\nSử dụng phím [Chuột Phải] để ngắm, [Chuột Trái] để chụp hình.\nNhấn [Tab] hoặc [I] để mở Sổ Nhật Ký.";
-            descText.fontSize = 16;
-            descText.color = Color.white;
-            descText.alignment = TextAlignmentOptions.Center;
+            descText.text = "Máy ảnh phim cũ ba mua hồi năm ngoái.\nVẫn còn xài tốt nhưng ống kính hơi rít...\n\n<color=#FFD700><b>Hướng dẫn sử dụng:</b></color>\n• <b>[Chuột Phải]</b>: Ngắm ống kính\n• <b>[Chuột Trái]</b>: Chụp ảnh\n• <b>[Tab] / [I]</b>: Mở Sổ Nhật Ký";
+            descText.fontSize = 12.5f;
+            descText.color = new Color(0.9f, 0.9f, 0.9f, 1f);
+            descText.lineSpacing = 4f;
+            descText.alignment = TextAlignmentOptions.TopLeft;
+            descText.enableWordWrapping = true;
 
-            // Button hint
+            // --- Hint (Bottom Capsule) ---
             GameObject hintObj = new GameObject("HintText");
             hintObj.transform.SetParent(cameraPopupPanel.transform, false);
             var hintRect = hintObj.AddComponent<RectTransform>();
-            hintRect.anchorMin = new Vector2(0.5f, 0f);
-            hintRect.anchorMax = new Vector2(0.5f, 0f);
+            hintRect.anchorMin = new Vector2(0f, 0f);
+            hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
-            hintRect.anchoredPosition = new Vector2(0, 20);
-            hintRect.sizeDelta = new Vector2(400, 30);
-            var hintText = hintObj.AddComponent<TextMeshProUGUI>();
-            hintText.text = "[Chuột Trái / Space] Đóng";
-            hintText.fontSize = 14;
-            hintText.color = Color.gray;
+            hintRect.anchoredPosition = new Vector2(0, 12);
+            hintRect.sizeDelta = new Vector2(-40f, 26f);
+            
+            hintObj.AddComponent<Image>().color = new Color(0.15f, 0.15f, 0.18f, 0.8f);
+            var hintOutline = hintObj.AddComponent<Outline>();
+            hintOutline.effectColor = new Color(0.25f, 0.25f, 0.3f, 0.4f);
+            hintOutline.effectDistance = new Vector2(1f, 1f);
+
+            GameObject hintTxtGo = new GameObject("Text");
+            hintTxtGo.transform.SetParent(hintObj.transform, false);
+            var htRect = hintTxtGo.AddComponent<RectTransform>();
+            htRect.anchorMin = Vector2.zero;
+            htRect.anchorMax = Vector2.one;
+            htRect.sizeDelta = Vector2.zero;
+            var hintText = hintTxtGo.AddComponent<TextMeshProUGUI>();
+            hintText.text = "<color=#aaaaaa>Nhấn</color> <b>[ Chuột Trái ]</b> <color=#aaaaaa>hoặc</color> <b>[ Space ]</b> <color=#aaaaaa>để Đóng</color>";
+            hintText.fontSize = 11.5f;
+            hintText.color = Color.white;
             hintText.alignment = TextAlignmentOptions.Center;
+            hintText.enableWordWrapping = false;
+
 
 
             // 2. Build Sổ Nhật Ký (Diary UI)
