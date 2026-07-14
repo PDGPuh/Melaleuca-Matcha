@@ -4,6 +4,8 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 namespace RungTramTraSu
 {
@@ -274,69 +276,189 @@ namespace RungTramTraSu
             ClearActiveBirds();
 
             int count = Random.Range(5, 8);
-            string[] species = new string[] { "lb_robinHQ", "lb_sparrowHQ", "lb_goldFinchHQ", "lb_blueJayHQ", "lb_cardinalHQ" };
+            
+            // Choose species pool based on current checkpoint
+            BirdInfo[] speciesPool;
+            if (currentCheckpoint == 1) speciesPool = Level1Species;
+            else if (currentCheckpoint == 2) speciesPool = Level2Species;
+            else speciesPool = Level3Species;
 
             for (int i = 0; i < count; i++)
             {
-                GameObject prefab = null;
-                if (birdPrefabs != null && birdPrefabs.Count > 0)
+                // Select bird species
+                BirdInfo selectedSpecies = speciesPool[Random.Range(0, speciesPool.Length)];
+                bool isSarus = false;
+
+                // 15% chance to spawn a Sarus Crane representation for the first bird
+                if (i == 0 && Random.value < 0.15f)
                 {
-                    prefab = birdPrefabs[Random.Range(0, birdPrefabs.Count)];
+                    selectedSpecies = SarusCraneSpecies;
+                    isSarus = true;
                 }
 
-                if (prefab == null)
-                {
-                    string prefabName = species[Random.Range(0, species.Length)];
-                    prefab = Resources.Load<GameObject>(prefabName);
-                }
+                // Get prefab path and target height dynamically
+                string prefabPath;
+                float targetHeight;
+                GetPrefabPathAndTargetHeight(selectedSpecies.vietnameseName, out prefabPath, out targetHeight);
 
+                GameObject prefab = Resources.Load<GameObject>(prefabPath);
                 if (prefab == null) continue;
 
-                GameObject bird = Instantiate(prefab, Vector3.zero, Quaternion.identity);
-                bird.name = "CheckpointBird_" + i;
+                // Create container and instantiate model
+                GameObject container = new GameObject("CheckpointBird_" + i);
+                GameObject model = Instantiate(prefab, container.transform);
+                model.name = "VisualModel";
+                model.transform.localPosition = Vector3.zero;
+                model.transform.localRotation = Quaternion.identity;
+                model.transform.localScale = Vector3.one;
 
                 // Disable and destroy lb_Bird script to prevent it from running its own AI behavior
-                var lbBird = bird.GetComponent<lb_Bird>();
+                var lbBird = container.GetComponentInChildren<lb_Bird>();
                 if (lbBird != null)
                 {
                     lbBird.enabled = false;
                     Destroy(lbBird);
                 }
 
-                // Force play flying animation state
-                var anim = bird.GetComponent<Animator>();
+                // Play animation clip dynamically via PlayableGraph
+                var anim = container.GetComponentInChildren<Animator>();
                 if (anim != null)
                 {
-                    anim.SetBool("flying", true);
+                    anim.enabled = true;
+                    AnimationClip flyClip = null;
+                    Object[] subAssets = Resources.LoadAll(prefabPath);
+                    foreach (var asset in subAssets)
+                    {
+                        if (asset is AnimationClip)
+                        {
+                            flyClip = (AnimationClip)asset;
+                            break;
+                        }
+                    }
+                    if (flyClip != null)
+                    {
+                        var birdAnim = container.AddComponent<StorkFlightAnimator>();
+                        birdAnim.Setup(anim, flyClip);
+                    }
+                    else
+                    {
+                        anim.SetBool("flying", true);
+                    }
                 }
 
                 // Make sure it has a sphere collider for any photo/viewport checks
-                var col = bird.GetComponent<Collider>();
+                var col = container.GetComponent<Collider>();
+                if (col == null) col = container.GetComponentInChildren<Collider>();
                 if (col == null)
                 {
-                    var scol = bird.AddComponent<SphereCollider>();
+                    var scol = container.AddComponent<SphereCollider>();
                     scol.isTrigger = true;
                     scol.radius = 1.5f;
                 }
 
                 // Add BirdDataHolder for metadata and Sarus Crane detection
-                var birdInfoHolder = bird.AddComponent<BirdDataHolder>();
-                birdInfoHolder.vietnameseName = GetBirdNameFromPrefab(prefab);
-                
-                // 15% chance to spawn a Sarus Crane representation (scaled up)
-                if (i == 0 && Random.value < 0.15f)
+                var birdInfoHolder = container.AddComponent<BirdDataHolder>();
+                birdInfoHolder.vietnameseName = selectedSpecies.vietnameseName;
+                birdInfoHolder.isSarus = isSarus;
+
+                if (isSarus)
                 {
-                    birdInfoHolder.isSarus = true;
-                    birdInfoHolder.vietnameseName = "Sếu đầu đỏ";
-                    bird.name = "Sarus_Crane";
-                    bird.transform.localScale = Vector3.one * 2.2f;
+                    container.name = "Sarus_Crane";
+                }
+
+                // Measure raw height at scale 1 and scale container dynamically to match the target world height!
+                float rawHeight = GetModelHeight(model);
+                if (rawHeight > 0f)
+                {
+                    container.transform.localScale = Vector3.one * (targetHeight / rawHeight);
                 }
                 else
                 {
-                    birdInfoHolder.isSarus = false;
+                    container.transform.localScale = Vector3.one * 0.25f; // fallback
                 }
 
-                activeBirds.Add(bird);
+                activeBirds.Add(container);
+            }
+        }
+
+        private float GetModelHeight(GameObject model)
+        {
+            if (model == null) return 0f;
+            var renderers = model.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return 0f;
+            
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                b.Encapsulate(renderers[i].bounds);
+            }
+            return b.size.y;
+        }
+
+        private void GetPrefabPathAndTargetHeight(string speciesName, out string prefabPath, out float targetHeight)
+        {
+            switch (speciesName)
+            {
+                case "Cò trắng":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.45f;
+                    break;
+                case "Diệc xám":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.55f;
+                    break;
+                case "Cò ốc":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.5f;
+                    break;
+                case "Già đẫy":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.6f;
+                    break;
+                case "Vạc":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.35f;
+                    break;
+                case "Cồng cộc":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.35f;
+                    break;
+                case "Cò bợ":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.3f;
+                    break;
+                case "Điêng điểng":
+                    prefabPath = "Fauna/CoBay";
+                    targetHeight = 0.4f;
+                    break;
+                case "Bói cá":
+                    prefabPath = "Fauna/common_kingfisher";
+                    targetHeight = 0.15f;
+                    break;
+                case "Le le":
+                    prefabPath = "Fauna/chimse2";
+                    targetHeight = 0.25f;
+                    break;
+                case "Bìm bịp":
+                    prefabPath = "Fauna/chimse2";
+                    targetHeight = 0.28f;
+                    break;
+                case "Én":
+                    prefabPath = "Fauna/Énv2";
+                    targetHeight = 0.12f;
+                    break;
+                case "Sếu đầu đỏ":
+                    prefabPath = "Fauna/Sếudaudo";
+                    targetHeight = 0.8f;
+                    break;
+                case "Trích cùi":
+                    prefabPath = "Fauna/chimse2";
+                    targetHeight = 0.25f;
+                    break;
+                default:
+                    prefabPath = "Fauna/chimse2";
+                    targetHeight = 0.25f;
+                    break;
             }
         }
 
@@ -365,6 +487,7 @@ namespace RungTramTraSu
         private string GetBirdNameFromPrefab(GameObject prefab)
         {
             if (prefab == null) return "Chim hoang dã";
+            if (prefab.name.Contains("CoBay")) return "Cò trắng";
 
             string engName = prefab.name.Replace("(Clone)", "").Replace("lb_", "").Replace("HQ", "");
             return TranslateToLocalBird(engName);
@@ -400,6 +523,17 @@ namespace RungTramTraSu
                             float curX = Mathf.Lerp(10f - i * 0.8f, 38f, progress);
                             float curY = 12f + Mathf.PingPong(i + Time.time, 2.5f);
                             float curZ = zCenter + 16f - progress * 4f;
+
+                            // Calculate direction to face the flight path
+                            float nextX = Mathf.Lerp(10f - i * 0.8f, 38f, Mathf.Min(progress + 0.01f, 1f));
+                            float nextY = 12f + Mathf.PingPong(i + (Time.time + 0.01f), 2.5f);
+                            float nextZ = zCenter + 16f - Mathf.Min(progress + 0.01f, 1f) * 4f;
+                            Vector3 dir = new Vector3(nextX - curX, nextY - curY, nextZ - curZ).normalized;
+                            if (dir != Vector3.zero)
+                            {
+                                activeBirds[i].transform.rotation = Quaternion.LookRotation(dir);
+                            }
+
                             activeBirds[i].transform.position = new Vector3(curX, curY, curZ);
                         }
                     }
@@ -656,6 +790,31 @@ namespace RungTramTraSu
     {
         public string vietnameseName;
         public bool isSarus;
+    }
+
+    public class StorkFlightAnimator : MonoBehaviour
+    {
+        private PlayableGraph graph;
+        
+        public void Setup(Animator anim, AnimationClip clip)
+        {
+            if (anim == null || clip == null) return;
+            graph = PlayableGraph.Create("StorkFlightGraph_" + gameObject.name);
+            graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+            var output = AnimationPlayableOutput.Create(graph, "Animation", anim);
+            var clipPlayable = AnimationClipPlayable.Create(graph, clip);
+            clip.wrapMode = WrapMode.Loop;
+            output.SetSourcePlayable(clipPlayable);
+            graph.Play();
+        }
+
+        private void OnDestroy()
+        {
+            if (graph.IsValid())
+            {
+                graph.Destroy();
+            }
+        }
     }
 }
 
