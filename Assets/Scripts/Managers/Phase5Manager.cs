@@ -51,6 +51,11 @@ namespace RungTramTraSu
         {
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
+
+            if (GetComponent<EndingDiaryController>() == null)
+            {
+                gameObject.AddComponent<EndingDiaryController>();
+            }
         }
 
         private void Start()
@@ -324,7 +329,7 @@ namespace RungTramTraSu
                 musicSource.Stop();
             }
 
-            // Fade to black (wait 2s regardless so the transition feels smooth)
+            // Fade to black
             if (ScreenFader.Instance != null)
             {
                 ScreenFader.Instance.StartFadeOut(2.0f, null);
@@ -340,72 +345,10 @@ namespace RungTramTraSu
                 yield return new WaitForSeconds(2.0f);
             }
 
-            // Play the outro video clip
-            if (videoPlayer == null)
-            {
-                videoPlayer = gameObject.GetComponent<UnityEngine.Video.VideoPlayer>();
-                if (videoPlayer == null)
-                {
-                    videoPlayer = gameObject.AddComponent<UnityEngine.Video.VideoPlayer>();
-                }
-            }
-
-            if (videoPlayer != null && outroVideo != null)
-            {
-                videoPlayer.source = UnityEngine.Video.VideoSource.VideoClip;
-                videoPlayer.clip = outroVideo;
-                videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.CameraNearPlane;
-                videoPlayer.targetCamera = Camera.main;
-                videoPlayer.aspectRatio = UnityEngine.Video.VideoAspectRatio.FitInside;
-                
-                // Set playOnAwake and loop to false
-                videoPlayer.playOnAwake = false;
-                videoPlayer.isLooping = false;
-
-                // Prepare
-                videoPlayer.Prepare();
-                Debug.Log("[EndingSequenceRoutine] Preparing outro video...");
-                while (!videoPlayer.isPrepared)
-                {
-                    yield return null;
-                }
-
-                // Play
-                videoPlayer.Play();
-                Debug.Log("[EndingSequenceRoutine] Started playing outro video.");
-
-                // Fade back in quickly so the player can actually see the video on screen (since we faded out to black before)
-                if (ScreenFader.Instance != null)
-                {
-                    ScreenFader.Instance.StartFadeIn(0.5f);
-                }
-
-                // Wait a bit to ensure isPlaying becomes true
-                yield return new WaitForSeconds(0.5f);
-
-                // Wait until the video is done playing
-                while (videoPlayer.isPlaying)
-                {
-                    yield return null;
-                }
-
-                // Fade out to black again as the video completes
-                if (ScreenFader.Instance != null)
-                {
-                    ScreenFader.Instance.StartFadeOut(1.0f, null);
-                    yield return new WaitForSeconds(1.0f);
-                }
-
-                // Stop and detach
-                videoPlayer.Stop();
-                videoPlayer.targetCamera = null;
-                Debug.Log("[EndingSequenceRoutine] Outro video finished.");
-            }
-
-            // Open Diary UI
+            // Mở Diary UI → nhạc cải lương → credits typewriter
             OpenDiaryUI();
 
-            // --- Fallback: if diaryCanvas is not assigned in Inspector, show a simple message ---
+            // Fallback nếu không có diaryCanvas
             if (diaryCanvas == null)
             {
                 UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
@@ -422,27 +365,20 @@ namespace RungTramTraSu
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // Stop other ambient sounds
-            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
-            if (ambientWind != null) ambientWind.Stop();
-            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
-            if (ambientRiver != null) ambientRiver.Stop();
-
-            // Play the outro background music
+            // Play the outro background music (cải lương)
             if (musicSource != null && climaxMusic != null)
             {
                 musicSource.clip = climaxMusic;
                 musicSource.loop = true;
                 musicSource.volume = 0.55f;
                 musicSource.Play();
-                Debug.Log("[OpenDiaryUI] Started playing outro background music: Hoang_Hon_Toc_Bac");
             }
 
             if (diaryCanvas != null)
             {
                 diaryCanvas.SetActive(true);
 
-                // Fade back in to reveal the diary UI after the post-video fade-out
+                // Fade back in to reveal the diary UI
                 if (ScreenFader.Instance != null)
                 {
                     ScreenFader.Instance.StartFadeIn(1.0f);
@@ -454,10 +390,7 @@ namespace RungTramTraSu
                     for (int i = 0; i < polaroidImages.Length; i++)
                     {
                         Texture2D tex = null;
-                        if (i == 0)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
-                        }
+                        if (i == 0) tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
                         else if (i == 1)
                         {
                             tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
@@ -472,17 +405,13 @@ namespace RungTramTraSu
                         }
                         else if (i == 3)
                         {
-                            // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
                             tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
                         }
-                        else if (i == 4)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
-                        }
+                        else if (i == 4) tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
 
                         if (polaroidImages[i] != null)
                         {
@@ -530,6 +459,7 @@ namespace RungTramTraSu
                 yield return new WaitForSeconds(0.015f);
             }
         }
+
 
         private void ReplayGame()
         {
