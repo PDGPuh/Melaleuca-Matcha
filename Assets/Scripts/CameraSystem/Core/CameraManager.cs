@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 namespace RungTramTraSu.CameraSystem
 {
@@ -76,6 +77,14 @@ namespace RungTramTraSu.CameraSystem
                 det.transform.SetParent(transform);
             }
 
+            // Ensure CameraUI exists programmatically
+            if (FindAnyObjectByType<CameraUI>() == null)
+            {
+                GameObject uiGo = new GameObject("CameraUI");
+                uiGo.AddComponent<CameraUI>();
+                uiGo.transform.SetParent(transform);
+            }
+
             // Sync unlocked status based on scene index or name on reload
             string name = SceneManager.GetActiveScene().name;
             if (name.Contains("Phase3") || name.Contains("Phase4") || name.Contains("Phase5"))
@@ -141,8 +150,8 @@ namespace RungTramTraSu.CameraSystem
         {
             if (mainCamera == null) mainCamera = Camera.main;
 
-            // Monitor toggling manual booklet guide
-            if (Input.GetKeyDown(KeyCode.H) && CameraGuide.Instance != null)
+            // Monitor toggling manual booklet guide using New Input System Keyboard check
+            if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame && CameraGuide.Instance != null)
             {
                 if (CameraGuide.Instance.gameObject.activeSelf) CameraGuide.Instance.CloseGuide();
                 else CameraGuide.Instance.OpenGuide();

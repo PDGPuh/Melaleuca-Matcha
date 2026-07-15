@@ -51,6 +51,11 @@ namespace RungTramTraSu
         {
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
+
+            if (GetComponent<EndingDiaryController>() == null)
+            {
+                gameObject.AddComponent<EndingDiaryController>();
+            }
         }
 
         private void Start()
@@ -312,152 +317,19 @@ namespace RungTramTraSu
                 if (controller != null) controller.SetFrozen(true);
             }
 
-            // Stop other ambient sounds
-            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
-            if (ambientWind != null) ambientWind.Stop();
-            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
-            if (ambientRiver != null) ambientRiver.Stop();
+            // Hide GameUI HUD
+            GameObject gameUI = GameObject.Find("GameUI");
+            if (gameUI != null) gameUI.SetActive(false);
 
-            // Stop the climax music
-            if (musicSource != null)
+            if (EndingDiaryController.Instance != null && diaryCanvas != null)
             {
-                musicSource.Stop();
-            }
-
-            // Fade to black (wait 2s regardless so the transition feels smooth)
-            if (ScreenFader.Instance != null)
-            {
-                ScreenFader.Instance.StartFadeOut(2.0f, null);
-                float elapsed = 0f;
-                while (elapsed < 2.0f)
-                {
-                    elapsed += Time.deltaTime;
-                    yield return null;
-                }
-            }
-            else
-            {
-                yield return new WaitForSeconds(2.0f);
-            }
-
-            // Play the outro video clip
-            if (videoPlayer == null)
-            {
-                videoPlayer = gameObject.GetComponent<UnityEngine.Video.VideoPlayer>();
-                if (videoPlayer == null)
-                {
-                    videoPlayer = gameObject.AddComponent<UnityEngine.Video.VideoPlayer>();
-                }
-            }
-
-            if (videoPlayer != null && outroVideo != null)
-            {
-                videoPlayer.source = UnityEngine.Video.VideoSource.VideoClip;
-                videoPlayer.clip = outroVideo;
-                videoPlayer.renderMode = UnityEngine.Video.VideoRenderMode.CameraNearPlane;
-                videoPlayer.targetCamera = Camera.main;
-                videoPlayer.aspectRatio = UnityEngine.Video.VideoAspectRatio.FitInside;
-                
-                // Set playOnAwake and loop to false
-                videoPlayer.playOnAwake = false;
-                videoPlayer.isLooping = false;
-
-                // Prepare
-                videoPlayer.Prepare();
-                Debug.Log("[EndingSequenceRoutine] Preparing outro video...");
-                while (!videoPlayer.isPrepared)
-                {
-                    yield return null;
-                }
-
-                // Play
-                videoPlayer.Play();
-                Debug.Log("[EndingSequenceRoutine] Started playing outro video.");
-
-                // Fade back in quickly so the player can actually see the video on screen (since we faded out to black before)
-                if (ScreenFader.Instance != null)
-                {
-                    ScreenFader.Instance.StartFadeIn(0.5f);
-                }
-
-                // Wait a bit to ensure isPlaying becomes true
-                yield return new WaitForSeconds(0.5f);
-
-                // Wait until the video is done playing
-                while (videoPlayer.isPlaying)
-                {
-                    yield return null;
-                }
-
-                // Fade out to black again as the video completes
-                if (ScreenFader.Instance != null)
-                {
-                    ScreenFader.Instance.StartFadeOut(1.0f, null);
-                    yield return new WaitForSeconds(1.0f);
-                }
-
-                // Stop and detach
-                videoPlayer.Stop();
-                videoPlayer.targetCamera = null;
-                Debug.Log("[EndingSequenceRoutine] Outro video finished.");
-            }
-
-            // Open Diary UI
-            OpenDiaryUI();
-
-            // --- Fallback: if diaryCanvas is not assigned in Inspector, show a simple message ---
-            if (diaryCanvas == null)
-            {
-                UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                yield return new WaitForSeconds(5f);
-                SceneManager.LoadScene("Phase1_GrandpaHouse");
-            }
-        }
-
-        private void OpenDiaryUI()
-        {
-            // Unlock mouse cursor for UI interaction
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-
-            // Stop other ambient sounds
-            var ambientWind = GameObject.Find("Ambient_Wind")?.GetComponent<AudioSource>();
-            if (ambientWind != null) ambientWind.Stop();
-            var ambientRiver = GameObject.Find("Ambient_River")?.GetComponent<AudioSource>();
-            if (ambientRiver != null) ambientRiver.Stop();
-
-            // Play the outro background music
-            if (musicSource != null && climaxMusic != null)
-            {
-                musicSource.clip = climaxMusic;
-                musicSource.loop = true;
-                musicSource.volume = 0.55f;
-                musicSource.Play();
-                Debug.Log("[OpenDiaryUI] Started playing outro background music: Hoang_Hon_Toc_Bac");
-            }
-
-            if (diaryCanvas != null)
-            {
-                diaryCanvas.SetActive(true);
-
-                // Fade back in to reveal the diary UI after the post-video fade-out
-                if (ScreenFader.Instance != null)
-                {
-                    ScreenFader.Instance.StartFadeIn(1.0f);
-                }
-
                 // Populate photos
                 if (PersistentGameManager.Instance != null && polaroidImages != null)
                 {
                     for (int i = 0; i < polaroidImages.Length; i++)
                     {
                         Texture2D tex = null;
-                        if (i == 0)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
-                        }
+                        if (i == 0) tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
                         else if (i == 1)
                         {
                             tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
@@ -472,17 +344,13 @@ namespace RungTramTraSu
                         }
                         else if (i == 3)
                         {
-                            // Tìm bất kỳ ảnh động vật nào đã chụp ở Phase 4
                             tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
                             if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
                         }
-                        else if (i == 4)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
-                        }
+                        else if (i == 4) tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
 
                         if (polaroidImages[i] != null)
                         {
@@ -500,36 +368,20 @@ namespace RungTramTraSu
                     }
                 }
 
-                // Typewriter diary text
-                StartCoroutine(TypewriterDiaryText());
-
-                // Set up restart button
-                if (replayButton != null)
-                {
-                    replayButton.onClick.RemoveAllListeners();
-                    replayButton.onClick.AddListener(ReplayGame);
-                }
+                RectTransform bgRect = diaryText != null ? diaryText.transform.parent.GetComponent<RectTransform>() : null;
+                EndingDiaryController.Instance.StartEndingSequence(diaryCanvas, bgRect, diaryText, polaroidImages, replayButton);
             }
-        }
-
-        private IEnumerator TypewriterDiaryText()
-        {
-            if (diaryText == null) yield break;
-
-            string fullText = "Cuốn sổ lưu niệm: Chuyến đi rừng tràm Trà Sư cùng Ông Ngoại...\n\n" +
-                              "\"Mình chưa từng nghĩ quê hương An Giang lại đẹp hoang sơ và kỳ vĩ đến vậy.\n" +
-                              "Màu xanh mướt của bèo tấm, tiếng chim cò líu lo, tia nắng rực rỡ lọc qua tán lá rừng sâu...\n" +
-                              "Lời ông ngoại dặn rất đúng: Thiên nhiên non nước hữu tình của mình, nếu chúng ta không gìn giữ và yêu thương, thì một ngày nào đó tụi nó sẽ biến mất mãi mãi...\"\n\n" +
-                              "Cảm ơn bạn đã trải nghiệm trò chơi Rừng Tràm Trà Sư!\n" +
-                              "Nhóm phát triển PRU213 - Unity 6000.4.7f1";
-
-            diaryText.text = "";
-            foreach (char c in fullText.ToCharArray())
+            else
             {
-                diaryText.text += c;
-                yield return new WaitForSeconds(0.015f);
+                // Fallback nếu không có diaryCanvas hoặc EndingDiaryController
+                UpdateObjectiveText("✓ Hoàn thành! Cảm ơn bạn đã chơi Rừng Tràm Trà Sư!\nChuyển về màn hình chính sau 5 giây...");
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                yield return new WaitForSeconds(5f);
+                SceneManager.LoadScene("Phase1_GrandpaHouse");
             }
         }
+
 
         private void ReplayGame()
         {

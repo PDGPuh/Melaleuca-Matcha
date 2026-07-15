@@ -26,8 +26,13 @@ namespace RungTramTraSu.CameraSystem
             // 1. Occlusion Check
             if (target.isOccluded)
             {
-                // Sunset quest has no occlusion check
-                if (target.displayName != "SunsetQuestTarget" && !target.displayName.Contains("Hoàng Hôn"))
+                // Sunset and Mango Tree quests have no occlusion check
+                bool ignoreOcclusion = target.displayName == "SunsetQuestTarget" || 
+                                       target.displayName.Contains("Hoàng Hôn") ||
+                                       target.displayName.Contains("Mango") ||
+                                       target.displayName.Contains("Xoài");
+
+                if (!ignoreOcclusion)
                 {
                     failReason = "Chủ thể bị che khuất bởi vật cản phía trước!";
                     return false;
