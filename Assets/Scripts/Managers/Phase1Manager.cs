@@ -7,7 +7,18 @@ namespace RungTramTraSu
 {
     public class Phase1Manager : MonoBehaviour
     {
-        public static Phase1Manager Instance { get; private set; }
+        private static Phase1Manager _instance;
+        public static Phase1Manager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<Phase1Manager>();
+                }
+                return _instance;
+            }
+        }
 
         public enum Phase1State
         {
@@ -51,11 +62,11 @@ namespace RungTramTraSu
 
         private void Awake()
         {
-            if (Instance == null)
+            if (_instance == null)
             {
-                Instance = this;
+                _instance = this;
             }
-            else
+            else if (_instance != this)
             {
                 Destroy(gameObject);
                 return;

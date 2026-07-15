@@ -26,10 +26,12 @@ namespace RungTramTraSu.CameraSystem
 
         [SerializeField] private int defaultLensIndex = 2; // 50mm default
         [SerializeField] private float smoothSpeed = 10f;
+        [SerializeField] private float defaultPlayerFOV = 60f; // FOV khi không dùng máy ảnh
 
         private int currentLensIndex;
         private float targetFOV;
         private Camera targetCamera;
+        private bool isActiveForCamera = false; // Chỉ apply FOV khi đang dùng camera
 
         public float CurrentFocalLength => lensPresets[currentLensIndex].focalLength;
         public string CurrentLensDescription => lensPresets[currentLensIndex].description;
@@ -76,10 +78,23 @@ namespace RungTramTraSu.CameraSystem
         private void Update()
         {
             if (targetCamera == null) targetCamera = Camera.main;
+            if (targetCamera == null) return;
 
-            if (targetCamera != null)
+            // Chỉ apply lens FOV khi đang ở chế độ camera
+            if (isActiveForCamera)
             {
                 targetCamera.fieldOfView = Mathf.Lerp(targetCamera.fieldOfView, targetFOV, Time.deltaTime * smoothSpeed);
+            }
+        }
+
+        /// <summary>Bật lens zoom — gọi khi mở camera viewfinder</summary>
+        public void SetCameraViewActive(bool active)
+        {
+            isActiveForCamera = active;
+            if (!active && targetCamera != null)
+            {
+                // Reset ngay về FOV bình thường khi thoát camera
+                targetCamera.fieldOfView = defaultPlayerFOV;
             }
         }
 

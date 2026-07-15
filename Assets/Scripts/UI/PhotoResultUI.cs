@@ -165,6 +165,13 @@ namespace RungTramTraSu
                 {
                     // Query score parameters
                     float blur = CameraManager.Instance.FocusSys.GetBlurFactor(visible[0].distance, CameraManager.Instance.ExpSys.CurrentAperture);
+                    
+                    // Sibling bypass: set blur to 0 for large environmental targets
+                    if (visible[0].displayName.Contains("Mango") || visible[0].displayName.Contains("Xoài") || visible[0].displayName.Contains("Sunset") || visible[0].displayName.Contains("Hoàng Hôn") || visible[0].displayName.Contains("Hoàng hôn"))
+                    {
+                        blur = 0f;
+                    }
+                    
                     score = PhotoScoring.Instance.CalculateScore(
                         visible[0],
                         CameraManager.Instance.FocusSys.CurrentFocusDistance,

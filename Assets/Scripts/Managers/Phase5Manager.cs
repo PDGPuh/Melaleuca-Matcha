@@ -13,7 +13,19 @@ namespace RungTramTraSu
             Instance = manager;
         }
 
-        public static Phase5Manager Instance { get; private set; }
+        private static Phase5Manager _instance;
+        public static Phase5Manager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<Phase5Manager>();
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         public bool IsEndingActive => dialogueTriggered;
 
@@ -49,8 +61,8 @@ namespace RungTramTraSu
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
-            else Destroy(gameObject);
+            if (_instance == null) _instance = this;
+            else if (_instance != this) Destroy(gameObject);
         }
 
         private void Start()

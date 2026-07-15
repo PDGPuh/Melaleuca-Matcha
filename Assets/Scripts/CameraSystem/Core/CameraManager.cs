@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 namespace RungTramTraSu.CameraSystem
 {
@@ -19,6 +20,7 @@ namespace RungTramTraSu.CameraSystem
         private bool isCameraActive = false;
         private bool isManualMode = false;
         private bool hasCameraUnlocked = false;
+        private bool isCameraActiveToggled = false;
 
         public bool IsCameraActive => isCameraActive;
         public bool IsManualMode => isManualMode;
@@ -76,6 +78,26 @@ namespace RungTramTraSu.CameraSystem
                 det.transform.SetParent(transform);
             }
 
+            // Ensure CameraUI exists
+            if (FindAnyObjectByType<CameraUI>() == null)
+            {
+                GameObject uiObj = new GameObject("[CameraUI]");
+                uiObj.AddComponent<CameraUI>();
+                uiObj.transform.SetParent(transform);
+            }
+
+            // Ensure PhotoScoring exists
+            if (FindAnyObjectByType<PhotoScoring>() == null)
+            {
+                gameObject.AddComponent<PhotoScoring>();
+            }
+
+            // Ensure PhotoValidator exists
+            if (FindAnyObjectByType<PhotoValidator>() == null)
+            {
+                gameObject.AddComponent<PhotoValidator>();
+            }
+
             // Sync unlocked status based on scene index or name on reload
             string name = SceneManager.GetActiveScene().name;
             if (name.Contains("Phase3") || name.Contains("Phase4") || name.Contains("Phase5"))
@@ -106,14 +128,25 @@ namespace RungTramTraSu.CameraSystem
         public void ToggleCameraMode()
         {
             if (!hasCameraUnlocked) return;
+            isCameraActiveToggled = !isCameraActiveToggled;
+            SetCameraActiveState(isCameraActiveToggled || (CameraInput.Instance != null && CameraInput.Instance.AimHeld));
+        }
 
-            isCameraActive = !isCameraActive;
+        public void SetCameraActiveState(bool active)
+        {
+            isCameraActive = active;
             
             // Adjust player controller movement constraints
             PlayerController player = FindAnyObjectByType<PlayerController>();
             if (player != null)
             {
                 player.SetMovementLocked(isCameraActive);
+            }
+
+            // Notify LensSystem to stop/start applying zoom FOV
+            if (lensSys != null)
+            {
+                lensSys.SetCameraViewActive(isCameraActive);
             }
 
             // Activate/Deactivate viewfinder
@@ -142,16 +175,28 @@ namespace RungTramTraSu.CameraSystem
             if (mainCamera == null) mainCamera = Camera.main;
 
             // Monitor toggling manual booklet guide
-            if (Input.GetKeyDown(KeyCode.H) && CameraGuide.Instance != null)
+            if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame && CameraGuide.Instance != null)
             {
                 if (CameraGuide.Instance.gameObject.activeSelf) CameraGuide.Instance.CloseGuide();
                 else CameraGuide.Instance.OpenGuide();
             }
 
-            // Check camera toggle key F
-            if (CameraInput.Instance != null && CameraInput.Instance.ToggleCameraPressed)
+            // Check camera toggle key F or holding right click (AimHeld)
+            if (CameraInput.Instance != null)
             {
-                ToggleCameraMode();
+                if (CameraInput.Instance.ToggleCameraPressed)
+                {
+                    ToggleCameraMode();
+                }
+
+                if (hasCameraUnlocked)
+                {
+                    bool shouldBeActive = CameraInput.Instance.AimHeld || isCameraActiveToggled;
+                    if (shouldBeActive != isCameraActive)
+                    {
+                        SetCameraActiveState(shouldBeActive);
+                    }
+                }
             }
 
             if (!isCameraActive) return;
@@ -291,6 +336,13 @@ namespace RungTramTraSu.CameraSystem
 
             // Generate score metrics
             float blur = targetFound ? focusSys.GetBlurFactor(bestTarget.distance, expSys.CurrentAperture) : 0f;
+            
+            // Bypass focus requirements for large environmental targets since they fill the screen and auto-focusing on them is unreliable
+            if (targetFound && (bestTarget.displayName.Contains("Mango") || bestTarget.displayName.Contains("Xoài") || bestTarget.displayName.Contains("Sunset") || bestTarget.displayName.Contains("Hoàng Hôn") || bestTarget.displayName.Contains("Hoàng hôn")))
+            {
+                blur = 0f;
+            }
+            
             float expErr = expSys.GetExposureError();
             
             PhotoScoring.ScoreResult score = PhotoScoring.Instance.CalculateScore(

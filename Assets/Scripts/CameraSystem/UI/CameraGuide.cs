@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.InputSystem;
 
 namespace RungTramTraSu.CameraSystem
 {
@@ -87,7 +88,7 @@ namespace RungTramTraSu.CameraSystem
             if (guidePanel == null || !guidePanel.activeSelf) return;
 
             // Close on escape or guide hotkey again
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 CloseGuide();
             }

@@ -115,6 +115,10 @@ namespace RungTramTraSu
 
         private void Update()
         {
+            // Skip all movement logic if CharacterController is disabled (e.g. player on boat in Phase 2)
+            if (characterController == null || !characterController.enabled || !gameObject.activeInHierarchy)
+                return;
+
             bool wasSwimming = isSwimming;
             UpdateWaterState();
 

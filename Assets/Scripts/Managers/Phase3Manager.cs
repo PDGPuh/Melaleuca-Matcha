@@ -8,7 +8,19 @@ namespace RungTramTraSu
 {
     public class Phase3Manager : MonoBehaviour
     {
-        public static Phase3Manager Instance { get; private set; }
+        private static Phase3Manager _instance;
+        public static Phase3Manager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<Phase3Manager>();
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         [Header("References")]
         [SerializeField] private Transform boat;
@@ -41,8 +53,8 @@ namespace RungTramTraSu
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
-            else Destroy(gameObject);
+            if (_instance == null) _instance = this;
+            else if (_instance != this) Destroy(gameObject);
         }
 
         private void Start()

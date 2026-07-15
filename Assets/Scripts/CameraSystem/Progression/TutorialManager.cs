@@ -38,28 +38,7 @@ namespace RungTramTraSu.CameraSystem
 
         private IEnumerator WelcomeLessonRoutine()
         {
-            yield return new WaitForSeconds(1.5f);
-            
-            // Lock player movement during lesson briefing
-            PlayerController player = FindAnyObjectByType<PlayerController>();
-            if (player != null) player.SetFrozen(true);
-
-            string[] lines = new string[]
-            {
-                "Con thấy chiếc máy ảnh cơ này đẹp không? Ngày xưa ba con gởi về cho ông đó.",
-                "Hôm nay đi chơi rừng tràm Trà Sư ông chỉ con cách chụp hình chuyên nghiệp nghe.",
-                "Đầu tiên, con hãy bấm phím F để giơ máy ảnh lên ngắm thử xem sao!"
-            };
-
-            bool dialogueDone = false;
-            DialogueManager.Instance.ShowDialogue("Ông Ngoại", lines, () => {
-                dialogueDone = true;
-            });
-
-            yield return new WaitUntil(() => dialogueDone);
-
-            if (player != null) player.SetFrozen(false);
-            
+            yield return new WaitForSeconds(0.5f);
             currentLesson = LessonStep.OpenCamera;
             isWaitingForAction = true;
         }
@@ -121,17 +100,6 @@ namespace RungTramTraSu.CameraSystem
         private IEnumerator ZoomLessonRoutine()
         {
             yield return new WaitForSeconds(0.5f);
-            
-            string[] lines = new string[]
-            {
-                "À giỏi lắm! Bảng chỉ số ống ngắm DSLR hiện lên rồi đó con.",
-                "Giờ con thử lăn bánh xe chuột (Mouse Wheel) để phóng to (Zoom) ống kính lên 135mm hoặc xa hơn xem nào."
-            };
-
-            bool dialogueDone = false;
-            DialogueManager.Instance.ShowDialogue("Ông Ngoại", lines, () => dialogueDone = true);
-            yield return new WaitUntil(() => dialogueDone);
-
             currentLesson = LessonStep.ZoomIn;
             isWaitingForAction = true;
         }
@@ -139,18 +107,6 @@ namespace RungTramTraSu.CameraSystem
         private IEnumerator ManualFocusLessonRoutine()
         {
             yield return new WaitForSeconds(0.5f);
-
-            string[] lines = new string[]
-            {
-                "Kính zoom nhìn gần rõ ràng quá hả con! Thấy cả tổ chim đằng xa luôn.",
-                "Mặc định máy ảnh tự động lấy nét (Auto Focus). Con có thể tắt nó đi bằng cách bấm phím G để tự chỉnh.",
-                "Bấm phím G chuyển sang chế độ Lấy Nét Thủ Công (Manual Focus) cho ông coi thử!"
-            };
-
-            bool dialogueDone = false;
-            DialogueManager.Instance.ShowDialogue("Ông Ngoại", lines, () => dialogueDone = true);
-            yield return new WaitUntil(() => dialogueDone);
-
             currentLesson = LessonStep.ManualFocus;
             isWaitingForAction = true;
         }
@@ -158,18 +114,6 @@ namespace RungTramTraSu.CameraSystem
         private IEnumerator ExposureLessonRoutine()
         {
             yield return new WaitForSeconds(0.5f);
-
-            string[] lines = new string[]
-            {
-                "Hay quá! Khi ở chế độ Thủ Công, con có thể đè Shift + Lăn chuột hoặc bấm Q/E để vặn nét xa gần tùy ý.",
-                "Kế tiếp là thông số ISO. Bấm phím I để thay đổi ISO. ISO càng cao ảnh càng sáng nhưng sẽ bị hạt noise đó con.",
-                "Con thử bấm phím I để đổi chỉ số ISO đi nào!"
-            };
-
-            bool dialogueDone = false;
-            DialogueManager.Instance.ShowDialogue("Ông Ngoại", lines, () => dialogueDone = true);
-            yield return new WaitUntil(() => dialogueDone);
-
             currentLesson = LessonStep.ChangeExposure;
             isWaitingForAction = true;
         }
@@ -177,19 +121,6 @@ namespace RungTramTraSu.CameraSystem
         private IEnumerator BurstLessonRoutine()
         {
             yield return new WaitForSeconds(0.5f);
-
-            string[] lines = new string[]
-            {
-                "Đúng rồi đó! Ngoài ra con có thể bấm phím K để đổi Tốc độ màn trập (Shutter Speed) giúp chụp chim bay nhanh không bị nhòe.",
-                "Bấm phím O để chỉnh Khẩu độ (Aperture) giúp mờ hậu cảnh (xóa phông).",
-                "Đặc biệt con có thể nhấn Giữ Chuột Trái để chụp liên tục (Burst Mode 10 FPS) bắt trọn mọi khoảnh khắc chuyển động của thú rừng.",
-                "Con đã nắm hết cách sử dụng rồi đó. Giờ hãy đi chụp cây Xoài cổ thụ đằng kia làm bài thực hành đầu tiên nghen!"
-            };
-
-            bool dialogueDone = false;
-            DialogueManager.Instance.ShowDialogue("Ông Ngoại", lines, () => dialogueDone = true);
-            yield return new WaitUntil(() => dialogueDone);
-
             currentLesson = LessonStep.BurstMode;
             isWaitingForAction = true;
         }
@@ -205,8 +136,8 @@ namespace RungTramTraSu.CameraSystem
         {
             switch (currentLesson)
             {
-                case LessonStep.Welcome: return "Nghe Ông Ngoại hướng dẫn...";
-                case LessonStep.OpenCamera: return "Hướng dẫn: Nhấn F để mở máy ảnh DSLR.";
+                case LessonStep.Welcome: return "Hướng dẫn: Giữ Chuột Phải để ngắm máy ảnh.";
+                case LessonStep.OpenCamera: return "Hướng dẫn: Giữ Chuột Phải để ngắm máy ảnh.";
                 case LessonStep.ZoomIn: return "Hướng dẫn: Lăn bánh xe chuột (Mouse Wheel) để zoom ống kính lên >= 135mm.";
                 case LessonStep.ManualFocus: return "Hướng dẫn: Nhấn G để đổi Focus Mode sang Thủ Công (Manual).";
                 case LessonStep.ChangeExposure: return "Hướng dẫn: Nhấn I để thay đổi giá trị ISO.";

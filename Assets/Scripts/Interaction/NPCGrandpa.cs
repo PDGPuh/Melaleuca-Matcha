@@ -64,10 +64,13 @@ namespace RungTramTraSu
         public void Interact()
         {
             Phase1Manager manager = Phase1Manager.Instance;
+            if (manager == null) manager = UnityEngine.Object.FindAnyObjectByType<Phase1Manager>();
+
             if (manager == null)
             {
                 // Check if Phase 5 is active
-                var phase5 = Phase5Manager.Instance;
+                Phase5Manager phase5 = Phase5Manager.Instance;
+                if (phase5 == null) phase5 = UnityEngine.Object.FindAnyObjectByType<Phase5Manager>();
                 if (phase5 != null)
                 {
                     phase5.StartClimaxDialogue();

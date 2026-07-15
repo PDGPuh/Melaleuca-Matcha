@@ -54,6 +54,9 @@ namespace RungTramTraSu
         {
             if (Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame))
             {
+                // Don't open diary if camera is currently active (aiming/viewfinder is active) to prevent key conflicts with Focus Lock and ISO
+                if (!isOpen && CameraManager.Instance != null && CameraManager.Instance.IsCameraActive) return;
+
                 // Don't open diary if camera manual guide is active to avoid overlay clashes
                 if (CameraGuide.Instance != null && CameraGuide.Instance.gameObject.activeSelf) return;
                 

@@ -109,9 +109,13 @@ namespace RungTramTraSu.CameraSystem
             isCapturing = true;
 
             // 1. Hide viewfinder canvas and UI HUD
-            CameraUI.Instance.SetViewfinderActive(false);
+            if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(false);
+            
             GameObject gameUI = GameObject.Find("GameUI");
             if (gameUI != null) gameUI.SetActive(false);
+
+            GameObject oldViewfinder = GameObject.Find("ViewfinderCanvas");
+            if (oldViewfinder != null) oldViewfinder.SetActive(false);
 
             // Wait for end of frame to read pixels
             yield return new WaitForEndOfFrame();
@@ -123,8 +127,9 @@ namespace RungTramTraSu.CameraSystem
             tex.Apply();
 
             // Restore HUD UI
+            if (oldViewfinder != null) oldViewfinder.SetActive(true);
             if (gameUI != null) gameUI.SetActive(true);
-            CameraUI.Instance.SetViewfinderActive(true);
+            if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(true);
 
             // Shutter click sound + screen white flash
             PlayShutterSound();
@@ -145,9 +150,13 @@ namespace RungTramTraSu.CameraSystem
             while (isBurstModeActive && capturedFrames < maxBurstFrames)
             {
                 // Disable UI temporarily
-                CameraUI.Instance.SetViewfinderActive(false);
+                if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(false);
+                
                 GameObject gameUI = GameObject.Find("GameUI");
                 if (gameUI != null) gameUI.SetActive(false);
+
+                GameObject oldViewfinder = GameObject.Find("ViewfinderCanvas");
+                if (oldViewfinder != null) oldViewfinder.SetActive(false);
 
                 yield return new WaitForEndOfFrame();
 
@@ -157,8 +166,9 @@ namespace RungTramTraSu.CameraSystem
                 tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 tex.Apply();
 
+                if (oldViewfinder != null) oldViewfinder.SetActive(true);
                 if (gameUI != null) gameUI.SetActive(true);
-                CameraUI.Instance.SetViewfinderActive(true);
+                if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(true);
 
                 PlayShutterSound();
                 TriggerFlash();

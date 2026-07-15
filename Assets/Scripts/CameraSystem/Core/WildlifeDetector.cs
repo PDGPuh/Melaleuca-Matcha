@@ -185,8 +185,9 @@ namespace RungTramTraSu.CameraSystem
                 }
             }
 
-            // 4. Scan by name fallback if quest targets are missing (e.g. MangoTree, SunsetQuestTarget)
-            GameObject mango = GameObject.Find("MangoTreeTarget");
+            // 4. Scan by name fallback if quest targets are missing (e.g. Mango_Tree_Target, SunsetQuestTarget)
+            GameObject mango = GameObject.Find("Mango_Tree_Target");
+            if (mango == null) mango = GameObject.Find("MangoTreeTarget");
             if (mango != null) ProcessTargetCandidate(mango, list);
 
             GameObject sunset = GameObject.Find("SunsetQuestTarget");
@@ -206,8 +207,26 @@ namespace RungTramTraSu.CameraSystem
             if (col != null) center = col.bounds.center;
 
             Vector3 viewportPos;
-            // Visible if in viewfinder frame
-            if (IsInViewfinder(center, out viewportPos, 0.1f))
+            
+            // Determine boundary margin based on the target type
+            float margin = 0.1f;
+            bool isLargeTarget = go.name.Contains("Mango") || go.name.Contains("Xoài") || go.name.Contains("Sunset") || go.name.Contains("Hoàng Hôn") || go.name.Contains("Hoàng hôn");
+            
+            bool inView = false;
+            if (isLargeTarget)
+            {
+                // Relax bounds for large environmental targets since player is close and their centers can fall off screen
+                viewportPos = mainCamera.WorldToViewportPoint(center);
+                inView = viewportPos.z > 0 &&
+                         viewportPos.x >= -0.15f && viewportPos.x <= 1.15f &&
+                         viewportPos.y >= -0.25f && viewportPos.y <= 1.35f;
+            }
+            else
+            {
+                inView = IsInViewfinder(center, out viewportPos, margin);
+            }
+
+            if (inView)
             {
                 float dist = Vector3.Distance(mainCamera.transform.position, center);
                 bool occluded = IsOccluded(center, go.transform);
