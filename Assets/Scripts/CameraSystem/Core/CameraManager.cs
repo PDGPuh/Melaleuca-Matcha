@@ -78,6 +78,7 @@ namespace RungTramTraSu.CameraSystem
                 det.transform.SetParent(transform);
             }
 
+<<<<<<< HEAD
             // Ensure CameraUI exists
             if (FindAnyObjectByType<CameraUI>() == null)
             {
@@ -174,7 +175,7 @@ namespace RungTramTraSu.CameraSystem
         {
             if (mainCamera == null) mainCamera = Camera.main;
 
-            // Monitor toggling manual booklet guide
+            // Monitor toggling manual booklet guide using New Input System Keyboard check
             if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame && CameraGuide.Instance != null)
             {
                 if (CameraGuide.Instance.gameObject.activeSelf) CameraGuide.Instance.CloseGuide();

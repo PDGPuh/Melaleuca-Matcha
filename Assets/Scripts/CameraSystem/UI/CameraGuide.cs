@@ -87,7 +87,7 @@ namespace RungTramTraSu.CameraSystem
         {
             if (guidePanel == null || !guidePanel.activeSelf) return;
 
-            // Close on escape or guide hotkey again
+            // Close on escape or guide hotkey again using New Input System
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 CloseGuide();
