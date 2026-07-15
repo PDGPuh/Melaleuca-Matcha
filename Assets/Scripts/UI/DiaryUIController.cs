@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.InputSystem;
+using RungTramTraSu.CameraSystem;
 
 namespace RungTramTraSu
 {
@@ -10,7 +11,7 @@ namespace RungTramTraSu
         public static DiaryUIController Instance { get; private set; }
 
         [Header("UI Panels")]
-        [SerializeField] private GameObject diaryPanel;          // The main Sổ Nhật Ký UI overlay panel
+        [SerializeField] private GameObject diaryPanel;
 
         [Header("Polaroid Raw Images")]
         [SerializeField] private RawImage imgPhase1Mango;
@@ -25,7 +26,7 @@ namespace RungTramTraSu
         [SerializeField] private RawImage imgPhase5Sunset;
 
         [Header("Inventory Item Icon")]
-        [SerializeField] private GameObject cameraInventoryIcon; // Visual showing camera in inventory
+        [SerializeField] private GameObject cameraInventoryIcon;
 
         private PlayerController playerController;
         private bool isOpen = false;
@@ -51,9 +52,11 @@ namespace RungTramTraSu
 
         private void Update()
         {
-            // Allow opening Diary starting from Phase 1/Phase 2
             if (Keyboard.current != null && (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame))
             {
+                // Don't open diary if camera manual guide is active to avoid overlay clashes
+                if (CameraGuide.Instance != null && CameraGuide.Instance.gameObject.activeSelf) return;
+                
                 ToggleDiary();
             }
         }
@@ -73,7 +76,6 @@ namespace RungTramTraSu
 
             if (isOpen)
             {
-                // Freeze player controls and show cursor
                 if (playerController != null)
                 {
                     playerController.SetFrozen(true);
@@ -81,12 +83,10 @@ namespace RungTramTraSu
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
 
-                // Load photos into frames
                 PopulatePhotos();
             }
             else
             {
-                // Resume player controls and hide cursor
                 if (playerController != null)
                 {
                     playerController.SetFrozen(false);
@@ -98,15 +98,13 @@ namespace RungTramTraSu
 
         public void PopulatePhotos()
         {
-            if (PersistentGameManager.Instance == null) return;
-
-            // Check if player has obtained camera
+            // Sync inventory item indicator
             bool hasCamera = false;
             var photoCamera = FindAnyObjectByType<PhotoCamera>();
             if (photoCamera != null) hasCamera = photoCamera.HasCamera;
-            // Also enable camera icon in inventory if player obtained it
             if (cameraInventoryIcon != null) cameraInventoryIcon.SetActive(hasCamera);
 
+            // Populate with mapped Album keys
             AssignPhotoToUI("Phase1_Mango", imgPhase1Mango);
             AssignPhotoToUI("Phase2_Ch1", imgPhase2Ch1);
             AssignPhotoToUI("Phase2_Ch2", imgPhase2Ch2);
@@ -123,16 +121,87 @@ namespace RungTramTraSu
         {
             if (uiImage == null) return;
 
-            Texture2D tex = PersistentGameManager.Instance.GetPhoto(category);
+            Texture2D tex = null;
+            AlbumManager.AlbumEntry entry = null;
+
+            // 1. Try to load from AlbumManager if available
+            if (AlbumManager.Instance != null)
+            {
+                string albumKey = GetAlbumKeyFromCategory(category);
+                if (!string.IsNullOrEmpty(albumKey))
+                {
+                    entry = AlbumManager.Instance.GetEntry(albumKey);
+                    if (entry != null)
+                    {
+                        tex = entry.cachedPhoto;
+                    }
+                }
+
+                // If specific key not found, check wildcards for birds in Phase 2
+                if (tex == null && category.StartsWith("Phase2_"))
+                {
+                    // Look for any bird entry in the album
+                    var birds = AlbumManager.Instance.GetEntriesByCategory("Birds");
+                    int birdIndex = 0;
+                    if (category == "Phase2_Ch2") birdIndex = 1;
+                    if (category == "Phase2_Ch3") birdIndex = 2;
+
+                    if (birds.Count > birdIndex)
+                    {
+                        entry = birds[birdIndex];
+                        tex = entry.cachedPhoto;
+                    }
+                }
+            }
+
+            // 2. Fall back to PersistentGameManager
+            if (tex == null && PersistentGameManager.Instance != null)
+            {
+                tex = PersistentGameManager.Instance.GetPhoto(category);
+            }
+
+            // Bind values
             if (tex != null)
             {
                 uiImage.texture = tex;
-                uiImage.color = Color.white; // Make visible
+                uiImage.color = Color.white;
+
+                // Find sibling TextMeshProUGUI to write score overlay
+                TextMeshProUGUI textMesh = uiImage.transform.parent != null ? uiImage.transform.parent.GetComponentInChildren<TextMeshProUGUI>() : null;
+                if (textMesh != null && entry != null)
+                {
+                    string stars = "";
+                    for (int s = 0; s < entry.starRating; s++) stars += "★";
+                    textMesh.text = $"{entry.vietnameseName}\nScore: {entry.bestScore:F0} {stars}";
+                    textMesh.fontSize = 11f;
+                }
             }
             else
             {
                 uiImage.texture = null;
-                uiImage.color = new Color(0.2f, 0.2f, 0.2f, 0.5f); // Grey placeholder
+                uiImage.color = new Color(0.18f, 0.18f, 0.18f, 0.65f);
+
+                TextMeshProUGUI textMesh = uiImage.transform.parent != null ? uiImage.transform.parent.GetComponentInChildren<TextMeshProUGUI>() : null;
+                if (textMesh != null)
+                {
+                    textMesh.text = "Chưa Chụp";
+                    textMesh.fontSize = 13f;
+                }
+            }
+        }
+
+        private string GetAlbumKeyFromCategory(string category)
+        {
+            switch (category)
+            {
+                case "Phase1_Mango": return "Cây Xoài Cổ Thụ";
+                case "Phase4_Stork": return "Cò Trắng";
+                case "Phase4_Snake": return "Rắn Nước";
+                case "Phase4_Fish": return "Cá Lóc";
+                case "Phase4_Butterfly": return "Bướm Hoa Súng";
+                case "Phase4_Duck": return "Vịt Trời";
+                case "Phase5_Sunset": return "Hoàng Hôn Rừng Tràm";
+                default: return "";
             }
         }
     }
