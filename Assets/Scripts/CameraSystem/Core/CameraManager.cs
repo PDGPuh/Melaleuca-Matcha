@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 namespace RungTramTraSu.CameraSystem
 {
@@ -149,8 +150,8 @@ namespace RungTramTraSu.CameraSystem
         {
             if (mainCamera == null) mainCamera = Camera.main;
 
-            // Monitor toggling manual booklet guide
-            if (Input.GetKeyDown(KeyCode.H) && CameraGuide.Instance != null)
+            // Monitor toggling manual booklet guide using New Input System Keyboard check
+            if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame && CameraGuide.Instance != null)
             {
                 if (CameraGuide.Instance.gameObject.activeSelf) CameraGuide.Instance.CloseGuide();
                 else CameraGuide.Instance.OpenGuide();
