@@ -47,7 +47,12 @@ namespace RungTramTraSu
             "Lập trình viên\n" +
             "Trương Chí Trung\n" +
             "Phạm Đinh Gia Phú\n" +
-            "Nguyễn Phương Khải\n\n" +
+            "Nguyễn Phương Khải\n" +
+            "Phan Thị Thảo Vy\n" +
+            "Đỗ Trọng Tín\n\n" +
+            "Kịch bản game\n" +
+            "Đỗ Trọng Tín\n" +
+            "Phạm Đinh Gia Phú\n\n" +
             "Hỗ trợ kỹ thuật & Âm thanh\n" +
             "Đỗ Trọng Tín\n\n" +
             "Giảng viên hướng dẫn\n" +
