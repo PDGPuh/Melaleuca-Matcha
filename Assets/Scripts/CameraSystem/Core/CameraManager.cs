@@ -76,6 +76,14 @@ namespace RungTramTraSu.CameraSystem
                 det.transform.SetParent(transform);
             }
 
+            // Ensure CameraUI exists programmatically
+            if (FindAnyObjectByType<CameraUI>() == null)
+            {
+                GameObject uiGo = new GameObject("CameraUI");
+                uiGo.AddComponent<CameraUI>();
+                uiGo.transform.SetParent(transform);
+            }
+
             // Sync unlocked status based on scene index or name on reload
             string name = SceneManager.GetActiveScene().name;
             if (name.Contains("Phase3") || name.Contains("Phase4") || name.Contains("Phase5"))
