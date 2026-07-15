@@ -317,6 +317,10 @@ namespace RungTramTraSu
                 if (controller != null) controller.SetFrozen(true);
             }
 
+            // Hide GameUI HUD
+            GameObject gameUI = GameObject.Find("GameUI");
+            if (gameUI != null) gameUI.SetActive(false);
+
             if (EndingDiaryController.Instance != null && diaryCanvas != null)
             {
                 // Populate photos

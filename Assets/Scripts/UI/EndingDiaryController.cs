@@ -91,6 +91,12 @@ namespace RungTramTraSu
             polaroidImages = photos;
             replayButton = replayBtn;
 
+            if (replayButton != null)
+            {
+                replayButton.onClick.RemoveAllListeners();
+                replayButton.onClick.AddListener(ReplayGame);
+            }
+
             Debug.Log($"[EndingDiary] StartEndingSequence called. canvas: {canvas?.name}, background: {background?.name}, textComp: {textComp?.name}, replayBtn: {replayBtn?.name}");
             StartCoroutine(EndingFlowRoutine());
         }
@@ -223,14 +229,25 @@ namespace RungTramTraSu
                 CanvasGroup cg = bgPanel.gameObject.GetComponent<CanvasGroup>();
                 if (cg == null) cg = bgPanel.gameObject.AddComponent<CanvasGroup>();
                 
+                CanvasGroup shadowCg = null;
+                Transform shadowTrans = diaryCanvas.transform.Find("BookShadow");
+                if (shadowTrans != null)
+                {
+                    shadowCg = shadowTrans.gameObject.GetComponent<CanvasGroup>();
+                    if (shadowCg == null) shadowCg = shadowTrans.gameObject.AddComponent<CanvasGroup>();
+                }
+
                 float elapsed = 0f;
                 while (elapsed < 1.5f)
                 {
                     elapsed += Time.deltaTime;
-                    cg.alpha = Mathf.Lerp(1f, 0f, elapsed / 1.5f);
+                    float alpha = Mathf.Lerp(1f, 0f, elapsed / 1.5f);
+                    cg.alpha = alpha;
+                    if (shadowCg != null) shadowCg.alpha = alpha;
                     yield return null;
                 }
                 bgPanel.gameObject.SetActive(false);
+                if (shadowTrans != null) shadowTrans.gameObject.SetActive(false);
             }
             else
             {
@@ -790,6 +807,15 @@ namespace RungTramTraSu
             AudioClip clip = AudioClip.Create("SyntheticScratch", sampleCount, 1, sampleRate, false);
             clip.SetData(samples, 0);
             return clip;
+        }
+
+        private void ReplayGame()
+        {
+            if (PersistentGameManager.Instance != null)
+            {
+                PersistentGameManager.Instance.ClearPhotos();
+            }
+            SceneManager.LoadScene("Phase1_GrandpaHouse");
         }
     }
 }
