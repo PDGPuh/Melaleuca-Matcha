@@ -233,7 +233,10 @@ namespace RungTramTraSu
                 }
 
                 // Move the CharacterController
-                characterController.Move(moveDirection * Time.deltaTime);
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(moveDirection * Time.deltaTime);
+                }
 
                 // Spawn water ripples while moving
                 if (currentInput.magnitude > 0.1f && Time.frameCount % 15 == 0)
@@ -288,7 +291,10 @@ namespace RungTramTraSu
                 }
 
                 // Di chuyển CharacterController
-                characterController.Move(moveDirection * Time.deltaTime);
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(moveDirection * Time.deltaTime);
+                }
             }
         }
 
