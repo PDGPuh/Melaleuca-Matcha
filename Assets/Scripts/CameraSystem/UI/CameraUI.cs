@@ -69,11 +69,11 @@ namespace RungTramTraSu.CameraSystem
             if (mgr == null) return;
 
             // 1. Text values
-            if (txtISO != null) txtISO.text = $"ISO: {mgr.ExpSys.CurrentISO}";
-            if (txtAperture != null) txtAperture.text = $"F/{mgr.ExpSys.CurrentAperture:F1}";
+            if (txtISO != null) txtISO.text = $"ISO: {mgr.ExpSys.ISO}";
+            if (txtAperture != null) txtAperture.text = $"F/{mgr.ExpSys.Aperture:F1}";
             if (txtShutter != null) txtShutter.text = mgr.ExpSys.CurrentShutterString;
             
-            float ev = mgr.ExpSys.CurrentEVCompensation;
+            float ev = mgr.ExpSys.EVValue;
             if (txtEV != null) txtEV.text = $"EV: {(ev >= 0 ? "+" : "")}{ev:F1}";
             
             if (txtWB != null)
@@ -88,55 +88,51 @@ namespace RungTramTraSu.CameraSystem
 
             if (txtFocusMode != null)
             {
-                txtFocusMode.text = mgr.FocusSys.IsAutoFocus ? "AF" : "MF";
-                txtFocusMode.color = mgr.FocusSys.IsAutoFocus ? Color.green : Color.yellow;
+                txtFocusMode.text = mgr.FocusSys.ActiveFocusMode == FocusMode.Manual ? "MF" : "AF";
+                txtFocusMode.color = mgr.FocusSys.ActiveFocusMode == FocusMode.Manual ? Color.yellow : Color.green;
             }
 
             if (txtFocalLength != null) txtFocalLength.text = $"{mgr.LensSys.CurrentFocalLength:F0}mm";
             
             if (txtFocusDistance != null)
             {
-                float dist = mgr.FocusSys.CurrentFocusDistance;
+                float dist = mgr.FocusSys.FocusDistance;
                 txtFocusDistance.text = dist >= 70f ? "∞" : $"{dist:F1}m";
             }
 
             // Update focus bar fill
             if (focusDistanceBarFill != null)
             {
-                // Normalize focus between 0.5m and 80m
-                float normalized = Mathf.InverseLerp(0.5f, 80f, mgr.FocusSys.CurrentFocusDistance);
+                float normalized = Mathf.InverseLerp(0.5f, 80f, mgr.FocusSys.FocusDistance);
                 focusDistanceBarFill.anchorMax = new Vector2(normalized, 1f);
             }
 
-            // Update battery and storage simulations
+            // Update battery and storage indicators from CameraManager
             if (txtBattery != null)
             {
-                float timePercent = Mathf.Clamp(100f - (Time.time * 0.05f), 10f, 100f);
-                txtBattery.text = $"[BATT: {timePercent:F0}%]";
+                txtBattery.text = $"[BATT: {mgr.BatteryPercentage:F0}%]";
+                txtBattery.color = mgr.BatteryPercentage < 20f ? Color.red : Color.white;
             }
 
-            if (txtStorage != null && AlbumManager.Instance != null)
+            if (txtStorage != null)
             {
-                int count = AlbumManager.Instance.Entries.Count;
-                int remaining = Mathf.Max(0, 100 - count);
-                txtStorage.text = $"[CARD: {remaining} SHOTS]";
+                txtStorage.text = $"[CARD: {mgr.AvailableStorage} SHOTS]";
+                txtStorage.color = mgr.AvailableStorage < 5 ? Color.red : Color.white;
             }
 
             // Update active target lock bracket
             if (focusLockBracket != null)
             {
-                if (mgr.FocusSys.HasTargetLock && mgr.FocusSys.LockedTarget != null)
+                if (mgr.FocusSys.HasTargetLock && mgr.FocusSys.LockTarget != null)
                 {
                     focusLockBracket.gameObject.SetActive(true);
                     
-                    // Center the UI bracket on the screen coordinate of the target
-                    Vector3 screenPoint = Camera.main.WorldToScreenPoint(mgr.FocusSys.LockedTarget.position);
+                    Vector3 screenPoint = Camera.main.WorldToScreenPoint(mgr.FocusSys.LockTarget.position);
                     focusLockBracket.rectTransform.position = screenPoint;
                     focusLockBracket.color = Color.green;
                 }
                 else
                 {
-                    // No active lock, park bracket at screen center and color it neutral grey
                     focusLockBracket.gameObject.SetActive(true);
                     focusLockBracket.rectTransform.anchoredPosition = Vector2.zero;
                     focusLockBracket.color = new Color(0.8f, 0.8f, 0.8f, 0.4f);
@@ -152,7 +148,7 @@ namespace RungTramTraSu.CameraSystem
                 }
                 else
                 {
-                    txtTutorialHint.text = mgr.IsManualMode ? "CHẾ ĐỘ THỦ CÔNG (Được thưởng điểm)" : "CHẾ ĐỘ TỰ ĐỘNG (TAB để khóa nét)";
+                    txtTutorialHint.text = mgr.IsManualMode ? "CHẾ ĐỘ THỦ CÔNG (Tự phơi sáng)" : "CHẾ ĐỘ TỰ ĐỘNG (TAB để khóa nét)";
                 }
             }
         }
@@ -160,17 +156,13 @@ namespace RungTramTraSu.CameraSystem
         private void UpdateHistogram()
         {
             histogramUpdateTimer += Time.deltaTime;
-            if (histogramUpdateTimer < 0.15f) return; // Update at ~6 FPS to save CPU
+            if (histogramUpdateTimer < 0.15f) return; 
             histogramUpdateTimer = 0f;
 
             CameraManager mgr = CameraManager.Instance;
             if (mgr == null || histogramBars.Count == 0) return;
 
-            // Generate a simulated histogram curve based on exposure error
-            // Perfect exposure error = 0 -> normal bell curve in center
-            // Overexposed (>1) -> shifted right
-            // Underexposed (<-1) -> shifted left
-            float err = mgr.ExpSys.GetExposureError();
+            float err = mgr.ExpSys.CalculateLuminanceDeviation();
             float centerPeak = 7 - Mathf.RoundToInt(err * 3f);
             centerPeak = Mathf.Clamp(centerPeak, 1, 13);
 
@@ -179,16 +171,13 @@ namespace RungTramTraSu.CameraSystem
                 float distToPeak = Mathf.Abs(i - centerPeak);
                 float heightFactor = Mathf.Clamp01(1f - (distToPeak / 7f));
                 
-                // Add minor random fluctuation
                 float fluctuation = Random.Range(-0.06f, 0.06f);
                 float finalHeight = Mathf.Clamp01(heightFactor * 0.9f + fluctuation + 0.1f);
 
-                // Set bar scale
                 histogramBars[i].localScale = new Vector3(1f, finalHeight, 1f);
             }
         }
 
-        // Programmatic UI construction
         private void BuildViewfinderUI()
         {
             canvasObject = new GameObject("[CameraViewfinderCanvas]");
@@ -203,7 +192,6 @@ namespace RungTramTraSu.CameraSystem
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            // Viewfinder Panel base (Transparent overlay)
             GameObject panel = CreateRT("ViewfinderPanel", canvasObject.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image panelImg = panel.AddComponent<Image>();
             panelImg.color = Color.clear;
@@ -212,12 +200,10 @@ namespace RungTramTraSu.CameraSystem
             // --- Top HUD Bar ---
             GameObject topBar = CreateRT("TopBar", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -40f), new Vector2(0f, 60f));
             txtBattery = CreateText("BatteryText", topBar.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(50f, 0f), new Vector2(250f, 40f), "[BATT: 100%]", 22f, TextAlignmentOptions.Left);
-            txtStorage = CreateText("StorageText", topBar.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-50f, 0f), new Vector2(250f, 40f), "[CARD: 100 SHOTS]", 22f, TextAlignmentOptions.Right);
+            txtStorage = CreateText("StorageText", topBar.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-50f, 0f), new Vector2(250f, 40f), "[CARD: 50 SHOTS]", 22f, TextAlignmentOptions.Right);
 
             // --- Bottom DSLR Settings Strip ---
             GameObject bottomBar = CreateRT("BottomBar", panel.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 40f), new Vector2(0f, 80f));
-            
-            // Add a clean dark strip background
             Image stripBg = bottomBar.AddComponent<Image>();
             stripBg.color = new Color(0.05f, 0.05f, 0.05f, 0.65f);
 
@@ -232,7 +218,7 @@ namespace RungTramTraSu.CameraSystem
             txtFocusMode = CreateText("FocusModeText", bottomBar.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(startOffset + blockWidth * 5f, 0f), new Vector2(blockWidth, 50f), "AF", 22f, TextAlignmentOptions.Center);
             txtFocalLength = CreateText("LensText", bottomBar.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(startOffset + blockWidth * 6f, 0f), new Vector2(blockWidth, 50f), "50mm", 22f, TextAlignmentOptions.Center);
 
-            // --- Focus Distance Bar (Horizontal scale slider) ---
+            // --- Focus Distance Bar ---
             GameObject focusBarBg = CreateRT("FocusBarBg", panel.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(400f, 8f));
             Image focusBarBgImg = focusBarBg.AddComponent<Image>();
             focusBarBgImg.color = new Color(0.3f, 0.3f, 0.3f, 0.6f);
@@ -245,13 +231,11 @@ namespace RungTramTraSu.CameraSystem
             txtFocusDistance = CreateText("FocusDistanceVal", focusBarBg.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(60f, 0f), new Vector2(80f, 30f), "10.0m", 18f, TextAlignmentOptions.Left);
             CreateText("FocusLabel", focusBarBg.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-70f, 0f), new Vector2(100f, 30f), "FOCUS DIST:", 18f, TextAlignmentOptions.Right);
 
-            // --- Center Focus Bracket (Camera framing) ---
+            // --- Center Focus Bracket ---
             GameObject bracketObj = CreateRT("FocusBracket", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 120f));
             focusLockBracket = bracketObj.AddComponent<Image>();
             focusLockBracket.color = new Color(0.8f, 0.8f, 0.8f, 0.4f);
             
-            // Draw a simple framing shape using outline components if possible, or simple crosshair texture representation
-            // We'll generate a programmatic outline using child borders to keep asset dependency clean
             CreateBorderLine("TL_H", bracketObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(15f, -2f), new Vector2(30f, 4f));
             CreateBorderLine("TL_V", bracketObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(2f, -15f), new Vector2(4f, 30f));
 
@@ -268,7 +252,6 @@ namespace RungTramTraSu.CameraSystem
             gridOverlay = CreateRT("GridOverlay", panel.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             gridOverlay.SetActive(true);
             
-            // Draw grid lines
             CreateGridLine("LineH1", gridOverlay.transform, new Vector2(0f, 0.333f), new Vector2(1f, 0.333f), Vector2.zero, new Vector2(0f, 1f));
             CreateGridLine("LineH2", gridOverlay.transform, new Vector2(0f, 0.666f), new Vector2(1f, 0.666f), Vector2.zero, new Vector2(0f, 1f));
             CreateGridLine("LineV1", gridOverlay.transform, new Vector2(0.333f, 0f), new Vector2(0.333f, 1f), Vector2.zero, new Vector2(1f, 0f));
@@ -279,7 +262,6 @@ namespace RungTramTraSu.CameraSystem
             Image histBg = histoPanel.AddComponent<Image>();
             histBg.color = new Color(0f, 0f, 0f, 0.45f);
 
-            // Populate histogram bars (15 vertical bars)
             int barCount = 15;
             float barSpacing = 12f;
             for (int i = 0; i < barCount; i++)
@@ -289,14 +271,13 @@ namespace RungTramTraSu.CameraSystem
                 Image barImg = bar.AddComponent<Image>();
                 barImg.color = new Color(0.9f, 0.9f, 0.9f, 0.7f);
                 
-                // Set pivot to bottom so it scales upwards
                 RectTransform rt = bar.GetComponent<RectTransform>();
                 rt.pivot = new Vector2(0.5f, 0f);
                 
                 histogramBars.Add(rt);
             }
 
-            // --- Tutorial Objective Overlay (Top-Center) ---
+            // --- Tutorial Objective Overlay ---
             GameObject tutObj = CreateRT("TutorialObjectivePanel", panel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -120f), new Vector2(700f, 60f));
             Image tutBg = tutObj.AddComponent<Image>();
             tutBg.color = new Color(0.1f, 0.1f, 0.1f, 0.75f);

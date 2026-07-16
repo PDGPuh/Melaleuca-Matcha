@@ -10,8 +10,9 @@ namespace RungTramTraSu.CameraSystem
         public static PhotoCapture Instance { get; private set; }
 
         [Header("Settings")]
-        [SerializeField] private float burstInterval = 0.1f; // 10 FPS Max
+        [SerializeField] private float burstInterval = 0.15f; 
         [SerializeField] private float flashDuration = 0.18f;
+        [SerializeField] private int targetPhotoHeight = 600; // Target resolution height for storage efficiency
 
         private AudioSource audioSource;
         private AudioClip syntheticShutterSound;
@@ -35,7 +36,6 @@ namespace RungTramTraSu.CameraSystem
             syntheticShutterSound = CreateSyntheticShutterSound();
         }
 
-        // Helper to synthesize DSLR shutter mirror click
         private AudioClip CreateSyntheticShutterSound()
         {
             int sampleRate = 44100;
@@ -109,43 +109,53 @@ namespace RungTramTraSu.CameraSystem
             isCapturing = true;
 
             // 1. Hide viewfinder canvas and UI HUD
-            CameraUI.Instance.SetViewfinderActive(false);
+            if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(false);
+            
             GameObject gameUI = GameObject.Find("GameUI");
             if (gameUI != null) gameUI.SetActive(false);
 
-            // Wait for end of frame to read pixels
             yield return new WaitForEndOfFrame();
 
+            // Read screen pixels
             int width = Screen.width;
             int height = Screen.height;
-            Texture2D tex = new Texture2D(width, height, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            tex.Apply();
+            Texture2D rawScreenTex = new Texture2D(width, height, TextureFormat.RGB24, false);
+            rawScreenTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            rawScreenTex.Apply();
 
             // Restore HUD UI
             if (gameUI != null) gameUI.SetActive(true);
-            CameraUI.Instance.SetViewfinderActive(true);
+            if (CameraUI.Instance != null && CameraManager.Instance != null && CameraManager.Instance.IsCameraActive)
+            {
+                CameraUI.Instance.SetViewfinderActive(true);
+            }
 
             // Shutter click sound + screen white flash
             PlayShutterSound();
             TriggerFlash();
 
+            // Use the captured screen texture directly to avoid rendering/blit lag that causes blank/black screenshots.
+            Texture2D resizedTex = rawScreenTex;
+
+            // Apply ISO noise
+            if (CameraManager.Instance != null && CameraManager.Instance.ExpSys != null)
+            {
+                ApplyNoiseToTexture(resizedTex, CameraManager.Instance.ExpSys.ISO);
+            }
+
             isCapturing = false;
-            callback?.Invoke(tex);
+            callback?.Invoke(resizedTex);
         }
 
         private IEnumerator BurstCaptureRoutine(Action<List<Texture2D>> callback)
         {
             List<Texture2D> burstList = new List<Texture2D>();
-            
-            // Limit burst to 10 frames maximum to avoid memory crash
-            int maxBurstFrames = 10;
+            int maxBurstFrames = 5; // Reduced to 5 for safety and speed
             int capturedFrames = 0;
 
             while (isBurstModeActive && capturedFrames < maxBurstFrames)
             {
-                // Disable UI temporarily
-                CameraUI.Instance.SetViewfinderActive(false);
+                if (CameraUI.Instance != null) CameraUI.Instance.SetViewfinderActive(false);
                 GameObject gameUI = GameObject.Find("GameUI");
                 if (gameUI != null) gameUI.SetActive(false);
 
@@ -153,20 +163,29 @@ namespace RungTramTraSu.CameraSystem
 
                 int width = Screen.width;
                 int height = Screen.height;
-                Texture2D tex = new Texture2D(width, height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                tex.Apply();
+                Texture2D rawScreenTex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                rawScreenTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                rawScreenTex.Apply();
 
                 if (gameUI != null) gameUI.SetActive(true);
-                CameraUI.Instance.SetViewfinderActive(true);
+                if (CameraUI.Instance != null && CameraManager.Instance != null && CameraManager.Instance.IsCameraActive)
+                {
+                    CameraUI.Instance.SetViewfinderActive(true);
+                }
 
                 PlayShutterSound();
                 TriggerFlash();
 
-                burstList.Add(tex);
+                Texture2D resizedTex = rawScreenTex;
+
+                if (CameraManager.Instance != null && CameraManager.Instance.ExpSys != null)
+                {
+                    ApplyNoiseToTexture(resizedTex, CameraManager.Instance.ExpSys.ISO);
+                }
+
+                burstList.Add(resizedTex);
                 capturedFrames++;
 
-                // Wait burst interval
                 float elapsed = 0f;
                 while (elapsed < burstInterval && isBurstModeActive)
                 {
@@ -177,6 +196,50 @@ namespace RungTramTraSu.CameraSystem
 
             isBurstModeActive = false;
             callback?.Invoke(burstList);
+        }
+
+        private Texture2D ResizeTextureGPU(Texture2D source, int targetWidth, int targetHeight)
+        {
+            RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0, RenderTextureFormat.ARGB32);
+            rt.filterMode = FilterMode.Bilinear;
+            RenderTexture.active = rt;
+            
+            Graphics.Blit(source, rt);
+            
+            Texture2D result = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
+            result.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+            result.Apply();
+            
+            RenderTexture.active = null;
+            RenderTexture.ReleaseTemporary(rt);
+            return result;
+        }
+
+        private void ApplyNoiseToTexture(Texture2D tex, int isoValue)
+        {
+            if (isoValue <= 200) return; // Silent clean sensor at lower ISOs
+
+            // Scale noise strength based on real-world ISO grain
+            // ISO 400: ~0.015, ISO 1600: ~0.04, ISO 12800: ~0.09
+            float noiseStrength = (isoValue - 200f) / 12600f * 0.08f + 0.01f;
+
+            // Reduce noise based on Sensor upgrades if the UpgradeManager exists
+            if (SaveSystem.Instance != null && SaveSystem.Instance.SensorUpgradeLevel > 1)
+            {
+                float reduction = (SaveSystem.Instance.SensorUpgradeLevel - 1) * 0.2f; // 20% noise reduction per level
+                noiseStrength *= Mathf.Max(0.2f, 1f - reduction);
+            }
+
+            Color[] pixels = tex.GetPixels();
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                float grain = UnityEngine.Random.Range(-noiseStrength, noiseStrength);
+                pixels[i].r = Mathf.Clamp01(pixels[i].r + grain);
+                pixels[i].g = Mathf.Clamp01(pixels[i].g + grain);
+                pixels[i].b = Mathf.Clamp01(pixels[i].b + grain);
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
         }
     }
 }

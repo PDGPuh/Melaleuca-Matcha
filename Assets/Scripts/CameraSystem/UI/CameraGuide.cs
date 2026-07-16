@@ -31,7 +31,7 @@ namespace RungTramTraSu.CameraSystem
                 title = "1. Tam Giác Phơi Sáng (Exposure Triangle)",
                 content = "Bức ảnh đẹp được quyết định bởi lượng ánh sáng đi vào cảm biến, được điều khiển bởi 3 thông số:\n\n" +
                           "• KHẨU ĐỘ (Aperture - F):\n" +
-                          "Độ mở của ống kính. F càng nhỏ (như F1.8) nhận nhiều ánh sáng hơn và làm mờ phông nền (xóa phông).\n\n" +
+                          "Độ mở của ống kính. F càng nhỏ (như F1.4) nhận nhiều ánh sáng hơn và làm mờ phông nền (xóa phông).\n\n" +
                           "• TỐC ĐỘ MÀN TRẬP (Shutter Speed):\n" +
                           "Thời gian cảm biến thu sáng. Tốc độ nhanh (như 1/1000s) giúp đóng băng các chuyển động nhanh của chim bay.\n\n" +
                           "• ISO (Độ nhạy sáng):\n" +
@@ -43,7 +43,7 @@ namespace RungTramTraSu.CameraSystem
                 content = "• TỰ ĐỘNG LẤY NÉT (Auto Focus - AF):\n" +
                           "Nhấn [TAB] để khóa nét vào con thú gần tâm ngắm nhất. Khung lấy nét sẽ chuyển sang màu xanh lá.\n\n" +
                           "• LẤY NÉT THỦ CÔNG (Manual Focus - MF):\n" +
-                          "Nhấn [G] để đổi chế độ. Dùng phím [Q] (gần) và [E] (xa) hoặc giữ [SHIFT + Cuộn chuột] để xoay vòng lấy nét.\n\n" +
+                          "Nhấn [G] để đổi chế độ. Giữ [SHIFT + Cuộn chuột] hoặc click chuột phải + Cuộn chuột để xoay vòng lấy nét.\n\n" +
                           "• CHỈ SỐ BLUR:\n" +
                           "Nếu lấy nét không chuẩn, chủ thể sẽ bị nhòe và không được tính điểm nhiệm vụ."
             },
@@ -61,7 +61,7 @@ namespace RungTramTraSu.CameraSystem
             {
                 title = "4. Chế Độ Chụp Liên Tục (Burst Mode)",
                 content = "• CÁCH SỬ DỤNG:\n" +
-                          "Trong khi đang ngắm máy ảnh (Giữ chuột phải), nhấn GIỮ CHUỘT TRÁI để máy ảnh chụp liên tiếp 10 bức ảnh mỗi giây (10 FPS).\n\n" +
+                          "Trong khi đang ngắm máy ảnh (Giữ chuột phải), nhấn GIỮ CHUỘT TRÁI để máy ảnh chụp liên tiếp 5 bức ảnh mỗi giây (5 FPS).\n\n" +
                           "• ƯU ĐIỂM:\n" +
                           "Rất thích hợp khi chụp các khoảnh khắc chuyển động nhanh như cá lóc nhảy lên mặt nước hoặc đàn chim bất ngờ bay vút lên.\n\n" +
                           "• LỰA CHỌN:\n" +
@@ -87,7 +87,6 @@ namespace RungTramTraSu.CameraSystem
         {
             if (guidePanel == null || !guidePanel.activeSelf) return;
 
-            // Close on escape or guide hotkey again using New Input System
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 CloseGuide();
@@ -102,11 +101,9 @@ namespace RungTramTraSu.CameraSystem
                 DisplayPage();
                 guidePanel.SetActive(true);
 
-                // Unlock cursor
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
 
-                // Freeze player
                 PlayerController player = FindAnyObjectByType<PlayerController>();
                 if (player != null) player.SetFrozen(true);
             }
@@ -118,11 +115,9 @@ namespace RungTramTraSu.CameraSystem
             {
                 guidePanel.SetActive(false);
 
-                // Lock cursor
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
 
-                // Resume player
                 PlayerController player = FindAnyObjectByType<PlayerController>();
                 if (player != null) player.SetFrozen(false);
             }
@@ -163,18 +158,15 @@ namespace RungTramTraSu.CameraSystem
             Canvas canvas = FindAnyObjectByType<Canvas>();
             if (canvas == null) return;
 
-            // Root panel (overlay background)
             guidePanel = CreateRT("CameraGuidePanel", canvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image bg = guidePanel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.85f);
             guidePanel.SetActive(false);
 
-            // Booklet Box
             GameObject box = CreateRT("GuideBookletBox", guidePanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 650f));
             Image boxImg = box.AddComponent<Image>();
             boxImg.color = new Color(0.96f, 0.95f, 0.90f);
 
-            // Title
             GameObject titleGo = CreateRT("BookletTitle", box.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(800f, 60f));
             txtGuideTitle = titleGo.AddComponent<TextMeshProUGUI>();
             txtGuideTitle.text = "Sách Hướng Dẫn Nhiếp Ảnh";
@@ -183,11 +175,9 @@ namespace RungTramTraSu.CameraSystem
             txtGuideTitle.color = new Color(0.15f, 0.1f, 0.05f);
             txtGuideTitle.alignment = TextAlignmentOptions.Center;
 
-            // Separator line
             GameObject sep = CreateRT("BookletSep", box.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -120f), new Vector2(800f, 4f));
             sep.AddComponent<Image>().color = new Color(0.7f, 0.65f, 0.55f);
 
-            // Body content
             GameObject bodyGo = CreateRT("BookletBody", box.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(800f, 400f));
             txtGuideBody = bodyGo.AddComponent<TextMeshProUGUI>();
             txtGuideBody.text = "Nội dung hướng dẫn...";
@@ -196,7 +186,6 @@ namespace RungTramTraSu.CameraSystem
             txtGuideBody.alignment = TextAlignmentOptions.TopLeft;
             txtGuideBody.enableWordWrapping = true;
 
-            // Buttons
             GameObject prevBtnGo = CreateButton("BtnPrev", box.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(100f, 50f), new Vector2(160f, 44f), "Trang Trước", PrevPage, out btnPrev);
             GameObject nextBtnGo = CreateButton("BtnNext", box.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-100f, 50f), new Vector2(160f, 44f), "Trang Tiếp", NextPage, out btnNext);
             GameObject closeBtnGo = CreateButton("BtnClose", box.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 50f), new Vector2(160f, 44f), "Đóng Hướng Dẫn", CloseGuide, out btnClose);
@@ -205,7 +194,7 @@ namespace RungTramTraSu.CameraSystem
         private GameObject CreateButton(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, string text, UnityEngine.Events.UnityAction action, out Button outBtn)
         {
             GameObject btnObj = CreateRT(name, parent, anchorMin, anchorMax, pos, size);
-            btnObj.GetComponent<RectTransform>().pivot = anchorMax; // Align pivots based on anchoring
+            btnObj.GetComponent<RectTransform>().pivot = anchorMax; 
             
             Image img = btnObj.AddComponent<Image>();
             img.color = new Color(0.18f, 0.15f, 0.12f, 1f);

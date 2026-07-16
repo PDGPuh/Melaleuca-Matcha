@@ -392,6 +392,16 @@ namespace RungTramTraSu
             scaler.matchWidthOrHeight = 0.5f;
 
             canvasGo.AddComponent<GraphicRaycaster>();
+
+            // Ensure an EventSystem exists in the scene so the Close button can receive click events
+            if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            {
+                GameObject esGo = new GameObject("[EventSystem]");
+                esGo.transform.SetParent(transform);
+                esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            }
+
             return canvas;
         }
 
