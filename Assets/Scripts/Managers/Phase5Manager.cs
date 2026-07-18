@@ -324,33 +324,11 @@ namespace RungTramTraSu
             if (EndingDiaryController.Instance != null && diaryCanvas != null)
             {
                 // Populate photos
-                if (PersistentGameManager.Instance != null && polaroidImages != null)
+                if (polaroidImages != null)
                 {
                     for (int i = 0; i < polaroidImages.Length; i++)
                     {
-                        Texture2D tex = null;
-                        if (i == 0) tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
-                        else if (i == 1)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                        }
-                        else if (i == 2)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
-                        }
-                        else if (i == 3)
-                        {
-                            tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
-                            if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
-                        }
-                        else if (i == 4) tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
+                        Texture2D tex = GetPhotoForEnding(i);
 
                         if (polaroidImages[i] != null)
                         {
@@ -380,8 +358,82 @@ namespace RungTramTraSu
                 yield return new WaitForSeconds(5f);
                 SceneManager.LoadScene("Phase1_GrandpaHouse");
             }
+
         }
 
+
+        private Texture2D GetPhotoForEnding(int index)
+        {
+            Texture2D tex = null;
+            CameraSystem.AlbumManager.AlbumEntry entry = null;
+
+            // 1. Try loading from AlbumManager
+            if (CameraSystem.AlbumManager.Instance != null)
+            {
+                if (index == 0)
+                {
+                    entry = CameraSystem.AlbumManager.Instance.GetEntry("Cây Xoài Cổ Thụ");
+                }
+                else if (index == 1)
+                {
+                    var birds = CameraSystem.AlbumManager.Instance.GetEntriesByCategory("Birds");
+                    if (birds.Count > 0) entry = birds[0];
+                }
+                else if (index == 2)
+                {
+                    var birds = CameraSystem.AlbumManager.Instance.GetEntriesByCategory("Birds");
+                    if (birds.Count > 1) entry = birds[1];
+                    else if (birds.Count > 0) entry = birds[0];
+                }
+                else if (index == 3)
+                {
+                    string[] phase4Keys = { "Cá Lóc", "Cò Trắng", "Vịt Trời", "Rắn Nước", "Bướm Hoa Súng" };
+                    foreach (var key in phase4Keys)
+                    {
+                        entry = CameraSystem.AlbumManager.Instance.GetEntry(key);
+                        if (entry != null) break;
+                    }
+                }
+                else if (index == 4)
+                {
+                    entry = CameraSystem.AlbumManager.Instance.GetEntry("Hoàng Hôn Rừng Tràm");
+                }
+
+                if (entry != null)
+                {
+                    tex = entry.cachedPhoto;
+                }
+            }
+
+            // 2. Fallback to PersistentGameManager
+            if (tex == null && PersistentGameManager.Instance != null)
+            {
+                if (index == 0) tex = PersistentGameManager.Instance.GetPhoto("Phase1_Mango");
+                else if (index == 1)
+                {
+                    tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                }
+                else if (index == 2)
+                {
+                    tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch3");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch2");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase2_Ch1");
+                }
+                else if (index == 3)
+                {
+                    tex = PersistentGameManager.Instance.GetPhoto("Phase4_Duck");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Stork");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Snake");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Fish");
+                    if (tex == null) tex = PersistentGameManager.Instance.GetPhoto("Phase4_Butterfly");
+                }
+                else if (index == 4) tex = PersistentGameManager.Instance.GetPhoto("Phase5_Sunset");
+            }
+
+            return tex;
+        }
 
         private void ReplayGame()
         {
@@ -391,6 +443,7 @@ namespace RungTramTraSu
             }
             SceneManager.LoadScene("Phase1_GrandpaHouse");
         }
+
 
         private void UpdateObjectiveText(string text)
         {

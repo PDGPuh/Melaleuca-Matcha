@@ -68,12 +68,23 @@ namespace RungTramTraSu
             isIntroDialogueStarted = false;
             popupReadyToClose = false;
 
+            // Xóa sạch ảnh cũ từ lần chơi trước để bắt đầu phiên chơi mới hoàn toàn
+            if (CameraSystem.AlbumManager.Instance != null)
+            {
+                CameraSystem.AlbumManager.Instance.ClearAlbum();
+            }
+            if (PersistentGameManager.Instance != null)
+            {
+                PersistentGameManager.Instance.ClearPhotos();
+            }
+
             // Khởi đầu ẩn model máy ảnh trên tay người chơi và tắt vùng trigger lên xuồng
             if (cameraHandModel != null) cameraHandModel.SetActive(false);
             if (boatTriggerZone != null) boatTriggerZone.SetActive(false);
 
             UpdateObjectiveText("Mục tiêu: Dùng W, A, S, D để đi tới bến nước và nói chuyện với Ông Ngoại (Nhấn E).");
         }
+
 
         /// <summary>
         /// Được gọi từ NPCGrandpa sau khi hội thoại đầu kết thúc
