@@ -161,18 +161,8 @@ namespace RungTramTraSu
                     UpdateObjective();
                 }
             }
-
-            // Check if player took a photo
-            if (Mouse.current.leftButton.wasPressedThisFrame && playerCamera != null)
-            {
-                var photoCamera = playerCamera.GetComponent<PhotoCamera>();
-                if (photoCamera != null && photoCamera.IsZooming)
-                {
-                    // Check if any animal is in viewport frame
-                    CheckAnimalCapture();
-                }
-            }
         }
+
 
         private void CheckAnimalCapture()
         {
@@ -572,11 +562,39 @@ namespace RungTramTraSu
             AnimalAI.AnimalType targetType = GetNextTargetType();
             objectiveText.text = $"Ảnh {capturedAnimals.Count}/5 | Tìm: {GetAnimalVietnameseName(targetType)}\n" +
                                  BuildCurrentHintSentence();
+
+            // Đồng bộ danh mục và mục tiêu với PhotoCamera để hệ thống camera tự kiểm tra nét, khoảng cách...
+            var photoCamera = FindAnyObjectByType<PhotoCamera>();
+            if (photoCamera != null)
+            {
+                photoCamera.SetPhotoCategory("Phase4_" + targetType.ToString());
+                AnimalAI targetAnimal = FindNearestAnimalOfType(targetType);
+                if (targetAnimal != null)
+                {
+                    photoCamera.SetQuestTarget(targetAnimal.transform);
+                }
+            }
+        }
+
+        public void OnPhotoQuestCompleted(CameraSystem.WildlifeDetector.DetectedTarget target)
+        {
+            var animal = target.go.GetComponent<AnimalAI>();
+            if (animal == null) animal = target.go.GetComponentInChildren<AnimalAI>();
+            if (animal == null && target.go.transform.parent != null) animal = target.go.transform.parent.GetComponent<AnimalAI>();
+
+            if (animal != null)
+            {
+                if (!capturedAnimals.Contains(animal.Type) && animal.Type == GetNextTargetType())
+                {
+                    StartCoroutine(RegisterCapture(animal.Type));
+                }
+            }
         }
 
         public void OnPhotoQuestCompleted()
         {
-            // Handled dynamically in CheckAnimalCapture, but we keep this empty method to avoid breaking callbacks
+            // Fallback
         }
+
     }
 }

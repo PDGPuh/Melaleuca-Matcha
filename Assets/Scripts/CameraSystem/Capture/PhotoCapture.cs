@@ -14,6 +14,9 @@ namespace RungTramTraSu.CameraSystem
         [SerializeField] private float flashDuration = 0.18f;
         [SerializeField] private int targetPhotoHeight = 600; // Target resolution height for storage efficiency
 
+        [Header("Audio")]
+        [SerializeField] private AudioClip shutterSoundClip; // Assign via Inspector or auto-loaded from Resources/Audio/Tieng_camera_2
+
         private AudioSource audioSource;
         private AudioClip syntheticShutterSound;
         private bool isCapturing = false;
@@ -33,6 +36,15 @@ namespace RungTramTraSu.CameraSystem
             audioSource = GetComponent<AudioSource>();
             if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
 
+            // Auto-load shutter sound from Resources if not assigned via Inspector
+            if (shutterSoundClip == null)
+            {
+                shutterSoundClip = Resources.Load<AudioClip>("Audio/Tieng_camera_2");
+                if (shutterSoundClip != null)
+                    Debug.Log("[PhotoCapture] Loaded shutter sound from Resources.");
+            }
+
+            // Keep synthetic as fallback
             syntheticShutterSound = CreateSyntheticShutterSound();
         }
 
@@ -75,7 +87,14 @@ namespace RungTramTraSu.CameraSystem
 
         public void PlayShutterSound()
         {
-            if (audioSource != null && syntheticShutterSound != null)
+            if (audioSource == null) return;
+
+            // Prefer real clip over synthetic
+            if (shutterSoundClip != null)
+            {
+                audioSource.PlayOneShot(shutterSoundClip);
+            }
+            else if (syntheticShutterSound != null)
             {
                 audioSource.PlayOneShot(syntheticShutterSound);
             }

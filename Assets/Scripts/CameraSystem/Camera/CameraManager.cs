@@ -46,6 +46,8 @@ namespace RungTramTraSu.CameraSystem
         public int MaxStorageUnits => maxStorageUnits;
         public int UsedStorageUnits => usedStorageUnits;
         public ImageFormat CurrentFormat => currentFormat;
+        public PhotoScoring.ScoreResult LastScore { get; private set; }
+
 
         public LensSystem LensSys => lensSys;
         public FocusSystem FocusSys => focusSys;
@@ -454,6 +456,8 @@ namespace RungTramTraSu.CameraSystem
                 expSys.ISO,
                 isManualMode
             );
+            LastScore = score;
+
 
             // Check validation for quests
             string failReason = "";
@@ -498,7 +502,7 @@ namespace RungTramTraSu.CameraSystem
                 }
 
                 // Call Phase completion hooks
-                TriggerPhaseValidationCallbacks();
+                TriggerPhaseValidationCallbacks(bestTarget);
             }
 
             // Deactivate camera first to reset FOV, lock states, and hide the viewfinder UI cleanly before showing result card
@@ -562,14 +566,15 @@ namespace RungTramTraSu.CameraSystem
             return res.totalScore;
         }
 
-        private void TriggerPhaseValidationCallbacks()
+        private void TriggerPhaseValidationCallbacks(WildlifeDetector.DetectedTarget target)
         {
             if (Phase1Manager.Instance != null) Phase1Manager.Instance.OnPhotoQuestCompleted();
-            if (Phase2Manager.Instance != null) Phase2Manager.Instance.OnPhotoQuestCompleted();
+            if (Phase2Manager.Instance != null) Phase2Manager.Instance.OnPhotoQuestCompleted(target);
             if (Phase3Manager.Instance != null) Phase3Manager.Instance.OnPhotoQuestCompleted();
-            if (Phase4Manager.Instance != null) Phase4Manager.Instance.OnPhotoQuestCompleted();
+            if (Phase4Manager.Instance != null) Phase4Manager.Instance.OnPhotoQuestCompleted(target);
             if (Phase5Manager.Instance != null) Phase5Manager.Instance.OnPhotoQuestCompleted();
         }
+
 
         private string GetDescBySubject(string name)
         {

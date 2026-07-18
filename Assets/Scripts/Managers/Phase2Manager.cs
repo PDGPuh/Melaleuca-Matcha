@@ -131,18 +131,8 @@ namespace RungTramTraSu
                 MoveBoat();
                 CheckEvents();
             }
-
-            // Kiểm tra ngắm chụp chim khi đang dừng ở Checkpoint
-            // Sử dụng coroutine để có thể chụp screenshot async + show PhotoResultUI
-            if (isAtCheckpoint && !isHandlingCapture &&
-                Mouse.current.leftButton.wasPressedThisFrame && photoCamera != null)
-            {
-                if (photoCamera.IsZooming)
-                {
-                    StartCoroutine(BirdCaptureWithPhotoRoutine());
-                }
-            }
         }
+
 
         private void MoveBoat()
         {
@@ -254,10 +244,10 @@ namespace RungTramTraSu
             {
                 photoCamera.UnlockCamera();
                 photoCamera.SetPhotoCategory(category);
-                // Bug 6 fix: Tắt auto-capture của PhotoCamera để tránh double-capture
-                // Phase2Manager tự xử lý click qua CheckBirdCapture()
-                photoCamera.SetCaptureEnabled(false);
+                // Giữ capture enabled để hệ thống camera hoạt động bình thường
+                photoCamera.SetCaptureEnabled(true);
             }
+
 
             UpdateObjectiveText($"Checkpoint {number}: {instructionText} (0/3)");
             DialogueManager.Instance.ShowDialogue("Ông Ngoại", new string[] {
@@ -728,10 +718,49 @@ namespace RungTramTraSu
             });
         }
 
+        public void OnPhotoQuestCompleted(CameraSystem.WildlifeDetector.DetectedTarget target)
+        {
+            if (isAtCheckpoint)
+            {
+                // Tìm con chim tương ứng trong danh sách activeBirds
+                GameObject birdGo = null;
+                foreach (var b in activeBirds)
+                {
+                    if (b == target.go || (target.go != null && target.go.transform.IsChildOf(b.transform)))
+                    {
+                        birdGo = b;
+                        break;
+                    }
+                }
+
+                if (birdGo != null)
+                {
+                    birdsCapturedAtCurrentCheckpoint++;
+                    
+                    var data = birdGo.GetComponent<BirdDataHolder>();
+                    if (data != null)
+                    {
+                        if (data.isSarus) sarusCraneCapturedAtCurrentCheckpoint = true;
+                    }
+
+                    activeBirds.Remove(birdGo);
+                    Destroy(birdGo);
+
+                    UpdateObjectiveText($"Checkpoint {currentCheckpoint}: Chụp ảnh đàn chim ({birdsCapturedAtCurrentCheckpoint}/3)");
+
+                    if (birdsCapturedAtCurrentCheckpoint >= 3)
+                    {
+                        ClearCheckpoint();
+                    }
+                }
+            }
+        }
+
         public void OnPhotoQuestCompleted()
         {
-            // Handled internally in CheckBirdCapture
+            // Fallback
         }
+
 
         private void OnDestroy()
         {
