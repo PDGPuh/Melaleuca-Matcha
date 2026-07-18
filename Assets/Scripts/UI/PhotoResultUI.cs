@@ -11,6 +11,8 @@ namespace RungTramTraSu
     /// <summary>
     /// Displays Polaroid photo results with scientific descriptions, 5-star grading, 
     /// mode badges (Auto/Manual), and detailed score breakdowns.
+    /// In non-blocking Polaroid HUD popup mode, it slides up from the bottom-right corner,
+    /// develops in real-time while the player can continue playing, and auto-closes.
     /// </summary>
     public class PhotoResultUI : MonoBehaviour
     {
@@ -30,7 +32,7 @@ namespace RungTramTraSu
         }
 
         [Header("Settings")]
-        [SerializeField] private float autoCloseDelay = 6f;
+        [SerializeField] private float autoCloseDelay = 4f;
 
         private GameObject panel;
         private RawImage photoDisplay;
@@ -46,6 +48,7 @@ namespace RungTramTraSu
 
         private Action onCloseCallback;
         private Coroutine developCoroutine;
+        private Coroutine closeCoroutine;
         private bool isShowing = false;
 
         private void Awake()
@@ -84,8 +87,16 @@ namespace RungTramTraSu
 
             if (photoDisplay != null) photoDisplay.texture = photo;
 
+            if (closeCoroutine != null)
+            {
+                StopCoroutine(closeCoroutine);
+                closeCoroutine = null;
+            }
+
             panel.SetActive(true);
-            FreezePlayer(true);
+            
+            // Non-blocking Polaroid HUD: keep player unfrozen, cursor locked
+            FreezePlayer(false);
 
             if (developCoroutine != null) StopCoroutine(developCoroutine);
             developCoroutine = StartCoroutine(DevelopPhotoRoutine(subjectName, description, isRare));
@@ -101,6 +112,36 @@ namespace RungTramTraSu
                 StopCoroutine(developCoroutine);
                 developCoroutine = null;
             }
+
+            if (closeCoroutine != null) StopCoroutine(closeCoroutine);
+            closeCoroutine = StartCoroutine(SlideOutAndCloseRoutine());
+        }
+
+        private IEnumerator SlideOutAndCloseRoutine()
+        {
+            Vector2 cardStartPos = cardRT != null ? cardRT.anchoredPosition : new Vector2(0f, 0f);
+            Vector2 cardTargetPos = new Vector2(0f, -850f);
+            Vector2 shadowStartPos = shadowRT != null ? shadowRT.anchoredPosition : new Vector2(8f, -8f);
+            Vector2 shadowTargetPos = new Vector2(8f, -858f);
+
+            float duration = 0.5f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / duration;
+                float curve = t * t; // Ease in
+
+                if (cardRT != null)
+                    cardRT.anchoredPosition = Vector2.Lerp(cardStartPos, cardTargetPos, curve);
+                if (shadowRT != null)
+                    shadowRT.anchoredPosition = Vector2.Lerp(shadowStartPos, shadowTargetPos, curve);
+
+                yield return null;
+            }
+
+            if (cardRT != null) cardRT.anchoredPosition = cardTargetPos;
+            if (shadowRT != null) shadowRT.anchoredPosition = shadowTargetPos;
 
             if (panel != null) panel.SetActive(false);
 
@@ -119,7 +160,7 @@ namespace RungTramTraSu
             }
             if (subjectNameText != null) subjectNameText.text = "";
             if (descriptionText != null) descriptionText.text = "";
-            if (rareBadgeText != null) rareBadgeText.gameObject.SetActive(false);
+            if (rareBadgeText != null) rareBadgeText.transform.parent.gameObject.SetActive(false);
             if (starsText != null) starsText.text = "";
             if (scoreBreakdownText != null) scoreBreakdownText.text = "";
 
@@ -140,7 +181,7 @@ namespace RungTramTraSu
                 float t = elapsed / duration;
                 float s = 1.15f;
                 t = t - 1f;
-                float curve = t * t * ((s + 1f) * t + s) + 1f;
+                float curve = t * t * ((s + 1f) * t + s) + 1f; // Overshoot bounce
 
                 if (cardRT != null)
                     cardRT.anchoredPosition = Vector2.LerpUnclamped(cardStartPos, cardTargetPos, curve);
@@ -164,7 +205,6 @@ namespace RungTramTraSu
                 hasValidScore = true;
             }
 
-
             // Type Subject Name
             if (subjectNameText != null)
             {
@@ -179,16 +219,16 @@ namespace RungTramTraSu
             // Rare badge
             if (isRare && rareBadgeText != null)
             {
-                rareBadgeText.gameObject.SetActive(true);
-                rareBadgeText.transform.localScale = Vector3.zero;
+                rareBadgeText.transform.parent.gameObject.SetActive(true);
+                rareBadgeText.transform.parent.localScale = Vector3.zero;
                 float badgeElapsed = 0f;
                 while (badgeElapsed < 0.25f)
                 {
                     badgeElapsed += Time.unscaledDeltaTime;
-                    rareBadgeText.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one * 1.15f, badgeElapsed / 0.25f);
+                    rareBadgeText.transform.parent.localScale = Vector3.Lerp(Vector3.zero, Vector3.one * 1.1f, badgeElapsed / 0.25f);
                     yield return null;
                 }
-                rareBadgeText.transform.localScale = Vector3.one;
+                rareBadgeText.transform.parent.localScale = Vector3.one;
             }
 
             // Type Description
@@ -239,6 +279,19 @@ namespace RungTramTraSu
                     scoreBreakdownText.text = breakdown;
                 }
             }
+
+            // Auto-close hold period
+            float holdTimer = 0f;
+            while (holdTimer < autoCloseDelay && isShowing)
+            {
+                holdTimer += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (isShowing)
+            {
+                CloseResult();
+            }
         }
 
         private void FreezePlayer(bool freeze)
@@ -262,77 +315,95 @@ namespace RungTramTraSu
         {
             Canvas canvas = FindOrCreateCanvas();
 
-            // Root Panel (dim bg)
+            // Root Panel (transparent, non-blocking)
             panel = CreateRT("PhotoResultPanel", canvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image dimBg = panel.AddComponent<Image>();
-            dimBg.color = new Color(0f, 0f, 0f, 0.82f);
+            dimBg.color = Color.clear;
+            dimBg.raycastTarget = false;
             panel.SetActive(false);
 
-            // Polaroid Card (Increased size to host score breakdown cleanly)
-            GameObject card = CreateRT("PhotoCard", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(740f, 680f));
+            // Polaroid Card (Compact corner UI size - now centered)
+            GameObject card = CreateRT("PhotoCard", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -850f), new Vector2(420f, 520f));
             cardRT = card.GetComponent<RectTransform>();
+            cardRT.pivot = new Vector2(0.5f, 0.5f);
             Image cardBg = card.AddComponent<Image>();
             cardBg.color = new Color(0.97f, 0.96f, 0.92f);
 
             // Shadow
-            GameObject shadow = CreateRT("CardShadow", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(8f, -8f), new Vector2(740f, 680f));
+            GameObject shadow = CreateRT("CardShadow", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(8f, -858f), new Vector2(420f, 520f));
             shadowRT = shadow.GetComponent<RectTransform>();
+            shadowRT.pivot = new Vector2(0.5f, 0.5f);
             Image shadowImg = shadow.AddComponent<Image>();
-            shadowImg.color = new Color(0f, 0f, 0f, 0.4f);
+            shadowImg.color = new Color(0f, 0f, 0f, 0.35f);
             shadow.transform.SetSiblingIndex(0);
 
-            // Viền đen ảnh
-            Image photoOutline = CreateRT("PhotoOutline", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(690f, 380f))
+            // Photo Outline
+            Image photoOutline = CreateRT("PhotoOutline", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(380f, 290f))
                                  .AddComponent<Image>();
             photoOutline.color = new Color(0.1f, 0.1f, 0.1f, 0.6f);
 
             // Photo Display
-            GameObject photoGo = CreateRT("PhotoDisplay", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(684f, 374f));
+            GameObject photoGo = CreateRT("PhotoDisplay", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(376f, 286f));
             photoGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             photoDisplay = photoGo.AddComponent<RawImage>();
             photoDisplay.color = Color.white;
 
+            // Rare Badge
+            GameObject badgeGo = CreateRT("RareBadgeText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-170f, -32f), new Vector2(85f, 22f));
+            badgeGo.GetComponent<RectTransform>().pivot = new Vector2(0f, 1f);
+            Image badgeBg = badgeGo.AddComponent<Image>();
+            badgeBg.color = new Color(0.85f, 0.15f, 0.15f, 0.9f);
+            
+            GameObject badgeTextGo = CreateRT("BadgeText", badgeGo.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            rareBadgeText = badgeTextGo.AddComponent<TextMeshProUGUI>();
+            rareBadgeText.text = "QUÝ HIẾM";
+            rareBadgeText.fontSize = 11f;
+            rareBadgeText.fontStyle = FontStyles.Bold;
+            rareBadgeText.alignment = TextAlignmentOptions.Center;
+            rareBadgeText.color = Color.white;
+            badgeGo.SetActive(false);
+
             // Stars Rating Text
-            GameObject starsGo = CreateRT("StarsText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -410f), new Vector2(680f, 36f));
+            GameObject starsGo = CreateRT("StarsText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -320f), new Vector2(380f, 26f));
             starsGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             starsText = starsGo.AddComponent<TextMeshProUGUI>();
             starsText.alignment = TextAlignmentOptions.Center;
-            starsText.fontSize = 28f;
-            starsText.color = new Color(1f, 0.78f, 0f); // Gold yellow
+            starsText.fontSize = 20f;
+            starsText.color = new Color(1f, 0.78f, 0f);
 
             // Subject Name
-            GameObject nameGo = CreateRT("SubjectNameText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -446f), new Vector2(680f, 40f));
+            GameObject nameGo = CreateRT("SubjectNameText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -348f), new Vector2(380f, 28f));
             nameGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             subjectNameText = nameGo.AddComponent<TextMeshProUGUI>();
             subjectNameText.alignment = TextAlignmentOptions.Center;
-            subjectNameText.fontSize = 26f;
+            subjectNameText.fontSize = 18f;
             subjectNameText.fontStyle = FontStyles.Bold;
             subjectNameText.color = new Color(0.12f, 0.08f, 0.04f);
 
             // Description
-            GameObject descGo = CreateRT("DescriptionText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -486f), new Vector2(680f, 60f));
+            GameObject descGo = CreateRT("DescriptionText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -378f), new Vector2(380f, 54f));
             descGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             descriptionText = descGo.AddComponent<TextMeshProUGUI>();
             descriptionText.alignment = TextAlignmentOptions.Center;
-            descriptionText.fontSize = 16f;
+            descriptionText.fontSize = 13f;
             descriptionText.color = new Color(0.2f, 0.16f, 0.12f);
             descriptionText.enableWordWrapping = true;
 
             // Separator Line
-            GameObject sep = CreateRT("ResultSeparator", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -546f), new Vector2(680f, 2f));
+            GameObject sep = CreateRT("ResultSeparator", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -438f), new Vector2(380f, 2f));
             sep.AddComponent<Image>().color = new Color(0.85f, 0.8f, 0.75f);
 
             // Score Breakdown text
-            GameObject scoreGo = CreateRT("ScoreBreakdownText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -554f), new Vector2(680f, 60f));
+            GameObject scoreGo = CreateRT("ScoreBreakdownText", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -446f), new Vector2(380f, 44f));
             scoreGo.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             scoreBreakdownText = scoreGo.AddComponent<TextMeshProUGUI>();
             scoreBreakdownText.alignment = TextAlignmentOptions.Center;
-            scoreBreakdownText.fontSize = 14f;
+            scoreBreakdownText.fontSize = 11f;
             scoreBreakdownText.color = new Color(0.25f, 0.22f, 0.18f);
             scoreBreakdownText.enableWordWrapping = true;
 
             // Close button
-            GameObject btnGo = CreateRT("CloseButton", card.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 16f), new Vector2(148f, 40f));
+            GameObject btnGo = CreateRT("CloseButton", card.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-15f, 12f), new Vector2(95f, 26f));
             btnGo.GetComponent<RectTransform>().pivot = new Vector2(1f, 0f);
             Image btnImg = btnGo.AddComponent<Image>();
             btnImg.color = new Color(0.18f, 0.15f, 0.12f, 1f);
@@ -344,15 +415,15 @@ namespace RungTramTraSu
             TextMeshProUGUI btnTmp = btnTextGo.AddComponent<TextMeshProUGUI>();
             btnTmp.text = "Đóng [Space]";
             btnTmp.alignment = TextAlignmentOptions.Center;
-            btnTmp.fontSize = 14f;
+            btnTmp.fontSize = 11f;
             btnTmp.color = Color.white;
 
             // Help Hint
-            GameObject hintGo = CreateRT("HintText", card.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(300f, 40f));
+            GameObject hintGo = CreateRT("HintText", card.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(15f, 12f), new Vector2(250f, 26f));
             hintGo.GetComponent<RectTransform>().pivot = Vector2.zero;
             TextMeshProUGUI hintTmp = hintGo.AddComponent<TextMeshProUGUI>();
             hintTmp.text = "Sổ nhật ký khoa học [Tab] để xem";
-            hintTmp.fontSize = 14f;
+            hintTmp.fontSize = 11f;
             hintTmp.color = new Color(0.4f, 0.35f, 0.3f);
         }
 
@@ -379,7 +450,6 @@ namespace RungTramTraSu
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            // Ensure an EventSystem exists in the scene so the Close button can receive click events
             if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
             {
                 GameObject esGo = new GameObject("[EventSystem]");

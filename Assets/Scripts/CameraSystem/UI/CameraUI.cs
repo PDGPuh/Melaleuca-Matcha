@@ -123,19 +123,30 @@ namespace RungTramTraSu.CameraSystem
             // Update active target lock bracket
             if (focusLockBracket != null)
             {
+                Color targetColor;
                 if (mgr.FocusSys.HasTargetLock && mgr.FocusSys.LockTarget != null)
                 {
                     focusLockBracket.gameObject.SetActive(true);
                     
                     Vector3 screenPoint = Camera.main.WorldToScreenPoint(mgr.FocusSys.LockTarget.position);
                     focusLockBracket.rectTransform.position = screenPoint;
-                    focusLockBracket.color = Color.green;
+                    targetColor = Color.green;
                 }
                 else
                 {
                     focusLockBracket.gameObject.SetActive(true);
                     focusLockBracket.rectTransform.anchoredPosition = Vector2.zero;
-                    focusLockBracket.color = new Color(0.8f, 0.8f, 0.8f, 0.4f);
+                    targetColor = new Color(0.9f, 0.9f, 0.9f, 0.8f);
+                }
+
+                // Propagate targetColor to all border lines and crosshair
+                focusLockBracket.color = Color.clear; // Hollow center
+                foreach (Image img in focusLockBracket.GetComponentsInChildren<Image>(true))
+                {
+                    if (img != focusLockBracket)
+                    {
+                        img.color = targetColor;
+                    }
                 }
             }
 
@@ -234,7 +245,7 @@ namespace RungTramTraSu.CameraSystem
             // --- Center Focus Bracket ---
             GameObject bracketObj = CreateRT("FocusBracket", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 120f));
             focusLockBracket = bracketObj.AddComponent<Image>();
-            focusLockBracket.color = new Color(0.8f, 0.8f, 0.8f, 0.4f);
+            focusLockBracket.color = Color.clear; // Hollow center!
             
             CreateBorderLine("TL_H", bracketObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(15f, -2f), new Vector2(30f, 4f));
             CreateBorderLine("TL_V", bracketObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(2f, -15f), new Vector2(4f, 30f));
@@ -247,6 +258,10 @@ namespace RungTramTraSu.CameraSystem
 
             CreateBorderLine("BR_H", bracketObj.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-15f, 2f), new Vector2(30f, 4f));
             CreateBorderLine("BR_V", bracketObj.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-2f, 15f), new Vector2(4f, 30f));
+
+            // Center Crosshair lines (+ symbol in the middle)
+            CreateBorderLine("Center_H", bracketObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f, 4f));
+            CreateBorderLine("Center_V", bracketObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(4f, 24f));
 
             // --- Rule of Thirds Grid Overlay ---
             gridOverlay = CreateRT("GridOverlay", panel.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
