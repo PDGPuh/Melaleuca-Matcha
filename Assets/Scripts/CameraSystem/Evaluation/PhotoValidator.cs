@@ -60,11 +60,19 @@ namespace RungTramTraSu.CameraSystem
             }
 
             // 2. Minimum screen coverage check
-            if (target.screenCoverage < 0.8f && !target.displayName.Contains("Hoàng Hôn"))
+            float minCoverage = 0.25f; // Lowered from 0.8f to be more forgiving
+            string sceneName = SceneManager.GetActiveScene().name;
+            if (sceneName.Contains("Phase2"))
             {
-                failReason = "Chủ thể quá xa hoặc quá nhỏ trong khung hình. Tiến lại gần hơn!";
+                minCoverage = 0.12f; // Fast flying birds can be very small
+            }
+
+            if (target.screenCoverage < minCoverage && !target.displayName.Contains("Hoàng Hôn"))
+            {
+                failReason = "Chủ thể quá xa hoặc quá nhỏ trong khung hình. Tiến lại gần hơn hoặc Zoom lớn lên!";
                 return false;
             }
+
 
             // 3. Focus Check
             if (blurFactor > 0.65f)
@@ -74,7 +82,7 @@ namespace RungTramTraSu.CameraSystem
             }
 
             // 4. Quest specific validation
-            string sceneName = SceneManager.GetActiveScene().name;
+
 
             if (sceneName.Contains("Phase1"))
             {
@@ -86,16 +94,21 @@ namespace RungTramTraSu.CameraSystem
             }
             else if (sceneName.Contains("Phase2"))
             {
-                bool isBird = target.displayName.Contains("Chim") || target.displayName.Contains("Cò") || 
+                bool isBird = target.category == "Birds" || 
+                              target.displayName.Contains("Chim") || target.displayName.Contains("Cò") || 
                               target.displayName.Contains("Sếu") || target.displayName.Contains("Diệc") || 
                               target.displayName.Contains("Vạc") || target.displayName.Contains("Le le") || 
-                              target.displayName.Contains("Én") || target.displayName.Contains("Bìm bịp");
+                              target.displayName.Contains("Én") || target.displayName.Contains("Bìm bịp") ||
+                              target.displayName.Contains("Già") || target.displayName.Contains("cộc") ||
+                              target.displayName.Contains("Trích") || target.displayName.Contains("Điêng") ||
+                              target.displayName.Contains("cá");
                 if (!isBird)
                 {
                     failReason = "Nhiệm vụ: Chụp các loài chim đang bay!";
                     return false;
                 }
             }
+
             else if (sceneName.Contains("Phase4"))
             {
                 if (!string.IsNullOrEmpty(activeQuestCategory) && activeQuestCategory.StartsWith("Phase4_"))

@@ -22,7 +22,7 @@ namespace RungTramTraSu
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab == null)
             {
-                Debug.LogWarning("Không tìm thấy mô hình tại đường dẫn: " + path);
+                Debug.LogWarning("KhĂ´ng tĂ¬m tháº¥y mĂ´ hĂ¬nh táº¡i Ä‘Æ°á»ng dáº«n: " + path);
                 return null;
             }
             
@@ -36,6 +36,47 @@ namespace RungTramTraSu
             return obj;
         }
 
+
+        /// <summary>
+        /// Tao model may anh phim cu hien thi o goc phai-duoi tam nhin nguoi choi.
+        /// Thay the placeholder Cube truoc day.
+        /// </summary>
+        private static GameObject CreateCameraHandModel(Transform cameraTransform)
+        {
+            const string modelPath = "Assets/Models/OldCamera/vintage_camera_3d_model.glb";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+
+            GameObject handModel;
+            if (prefab != null)
+            {
+                handModel = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+                if (handModel == null) handModel = Object.Instantiate(prefab);
+
+                handModel.name = "CameraHandModel";
+                handModel.transform.SetParent(cameraTransform, false);
+                handModel.transform.localPosition = new Vector3(0.18f, -0.28f, 0.38f);
+                // -90 trên X: đứng thẳng (GLB Blender Z-up → Unity Y-up)
+                //  90 trên Y: ống kính chỉ về phía trước cùng hướng player nhìn
+                handModel.transform.localRotation = Quaternion.Euler(-90f, 90f, 0f);
+                handModel.transform.localScale = new Vector3(0.18f, 0.18f, 0.18f);
+
+                foreach (var col in handModel.GetComponentsInChildren<Collider>())
+                    Object.DestroyImmediate(col);
+
+                Debug.Log("[Phase1Setup] Da gan model may anh co: " + modelPath);
+            }
+            else
+            {
+                Debug.LogWarning("[Phase1Setup] Khong tim thay model tai " + modelPath + ". Dung Cube placeholder.");
+                handModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                handModel.name = "CameraHandModel";
+                handModel.transform.SetParent(cameraTransform, false);
+                handModel.transform.localPosition = new Vector3(0.2f, -0.25f, 0.4f);
+                handModel.transform.localScale = new Vector3(0.12f, 0.08f, 0.1f);
+                Object.DestroyImmediate(handModel.GetComponent<BoxCollider>());
+            }
+            return handModel;
+        }
         private static void SetupGrandpaAnimator(GameObject grandpa)
         {
             if (grandpa == null) return;
@@ -43,7 +84,7 @@ namespace RungTramTraSu
             var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Grandpa/GrandpaAnimator.controller");
             if (controller == null)
             {
-                Debug.LogWarning("Không tìm thấy GrandpaAnimator.controller tại Assets/Animations/Grandpa/GrandpaAnimator.controller");
+                Debug.LogWarning("KhĂ´ng tĂ¬m tháº¥y GrandpaAnimator.controller táº¡i Assets/Animations/Grandpa/GrandpaAnimator.controller");
                 return;
             }
 
@@ -79,7 +120,7 @@ namespace RungTramTraSu
             {
                 if (mf.sharedMesh == null) continue;
 
-                // Kiểm tra số lượng tam giác để tránh tạo MeshCollider trên mesh quá lớn gây lag và lỗi PhysX (> 2 triệu)
+                // Kiá»ƒm tra sá»‘ lÆ°á»£ng tam giĂ¡c Ä‘á»ƒ trĂ¡nh táº¡o MeshCollider trĂªn mesh quĂ¡ lá»›n gĂ¢y lag vĂ  lá»—i PhysX (> 2 triá»‡u)
                 int triCount = 0;
                 if (mf.sharedMesh.subMeshCount > 0)
                 {
@@ -106,10 +147,10 @@ namespace RungTramTraSu
 
         private static void SetupPerfectBoatCollider(GameObject boat)
         {
-            // 1. Thêm MeshCollider tự động cho các mesh con để đứng vững trong lòng thuyền
+            // 1. ThĂªm MeshCollider tá»± Ä‘á»™ng cho cĂ¡c mesh con Ä‘á»ƒ Ä‘á»©ng vá»¯ng trong lĂ²ng thuyá»n
             AddMeshCollidersRecursively(boat);
 
-            // 2. Tính toán Bounds cục bộ để tạo BoxCollider bệ đỡ ở đáy thuyền chống lún
+            // 2. TĂ­nh toĂ¡n Bounds cá»¥c bá»™ Ä‘á»ƒ táº¡o BoxCollider bá»‡ Ä‘á»¡ á»Ÿ Ä‘Ă¡y thuyá»n chá»‘ng lĂºn
             MeshRenderer[] renderers = boat.GetComponentsInChildren<MeshRenderer>(true);
             if (renderers.Length == 0) return;
 
@@ -130,14 +171,14 @@ namespace RungTramTraSu
                 worldSize.z / (localScale.z == 0 ? 1f : localScale.z)
             );
 
-            // Thêm BoxCollider bệ đỡ ở đáy thuyền
+            // ThĂªm BoxCollider bá»‡ Ä‘á»¡ á»Ÿ Ä‘Ă¡y thuyá»n
             var solidCol = boat.AddComponent<BoxCollider>();
             
-            // Đảm bảo Y local tối thiểu là 0.4f (scale 5 tương đương 2m thế giới) để làm bệ đỡ dày chống xuyên thủng
+            // Äáº£m báº£o Y local tá»‘i thiá»ƒu lĂ  0.4f (scale 5 tÆ°Æ¡ng Ä‘Æ°Æ¡ng 2m tháº¿ giá»›i) Ä‘á»ƒ lĂ m bá»‡ Ä‘á»¡ dĂ y chá»‘ng xuyĂªn thá»§ng
             float finalLocalY = Mathf.Max(localSize.y, 0.4f);
             solidCol.size = new Vector3(localSize.x, finalLocalY, localSize.z);
 
-            // Hạ center của BoxCollider xuống một chút để không che hết khoang lòng thuyền của MeshCollider
+            // Háº¡ center cá»§a BoxCollider xuá»‘ng má»™t chĂºt Ä‘á»ƒ khĂ´ng che háº¿t khoang lĂ²ng thuyá»n cá»§a MeshCollider
             solidCol.center = new Vector3(localCenter.x, localCenter.y - (finalLocalY - localSize.y) / 2f, localCenter.z);
         }
 
@@ -166,7 +207,7 @@ namespace RungTramTraSu
                     {
                         layerProp.stringValue = layerName;
                         tagManager.ApplyModifiedProperties();
-                        Debug.Log("Tự động tạo Layer: " + layerName);
+                        Debug.Log("Tá»± Ä‘á»™ng táº¡o Layer: " + layerName);
                         break;
                     }
                 }
@@ -205,7 +246,7 @@ namespace RungTramTraSu
         {
             if (EditorApplication.isPlaying)
             {
-                EditorUtility.DisplayDialog("Lỗi!", "Không thể chạy thiết lập khi đang ở chế độ Play mode. Hãy tắt nút Play trước khi chạy!", "Đồng ý");
+                EditorUtility.DisplayDialog("Lá»—i!", "KhĂ´ng thá»ƒ cháº¡y thiáº¿t láº­p khi Ä‘ang á»Ÿ cháº¿ Ä‘á»™ Play mode. HĂ£y táº¯t nĂºt Play trÆ°á»›c khi cháº¡y!", "Äá»“ng Ă½");
                 return;
             }
 
@@ -214,7 +255,7 @@ namespace RungTramTraSu
                 return;
             }
 
-            // A. Cập nhật Skybox và Ambient Lighting cho Phase 1
+            // A. Cáº­p nháº­t Skybox vĂ  Ambient Lighting cho Phase 1
             Scene phase1Scene = EditorSceneManager.OpenScene("Assets/Scenes/Phase1_GrandpaHouse.unity", OpenSceneMode.Single);
             Material p1Skybox = AssetDatabase.LoadAssetAtPath<Material>("Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
             if (p1Skybox != null)
@@ -227,13 +268,13 @@ namespace RungTramTraSu
             EditorSceneManager.MarkSceneDirty(phase1Scene);
             EditorSceneManager.SaveScene(phase1Scene);
 
-            // 1. Chạy Setup Phase 2 -> 5 (các phase này tự động beautify ở cuối mỗi CreatePhaseXScene)
+            // 1. Cháº¡y Setup Phase 2 -> 5 (cĂ¡c phase nĂ y tá»± Ä‘á»™ng beautify á»Ÿ cuá»‘i má»—i CreatePhaseXScene)
             CreatePhase2Scene();
             CreatePhase3Scene();
             CreatePhase4Scene();
             CreatePhase5Scene();
             
-            // 2. Đăng ký Build Settings (giữ Phase 1 nguyên bản từ Git)
+            // 2. ÄÄƒng kĂ½ Build Settings (giá»¯ Phase 1 nguyĂªn báº£n tá»« Git)
             List<EditorBuildSettingsScene> buildScenes = new List<EditorBuildSettingsScene>();
             buildScenes.Add(new EditorBuildSettingsScene("Assets/Scenes/Phase1_GrandpaHouse.unity", true));
             buildScenes.Add(new EditorBuildSettingsScene("Assets/Scenes/Phase2_Canal.unity", true));
@@ -242,13 +283,13 @@ namespace RungTramTraSu
             buildScenes.Add(new EditorBuildSettingsScene("Assets/Scenes/Phase5_Sunset.unity", true));
             EditorBuildSettings.scenes = buildScenes.ToArray();
 
-            // 3. Tự động mở lại Scene Phase 1 làm Scene hoạt động hiện tại trong Editor
+            // 3. Tá»± Ä‘á»™ng má»Ÿ láº¡i Scene Phase 1 lĂ m Scene hoáº¡t Ä‘á»™ng hiá»‡n táº¡i trong Editor
             EditorSceneManager.OpenScene("Assets/Scenes/Phase1_GrandpaHouse.unity", OpenSceneMode.Single);
             
-            Debug.Log("==> HOÀN TẤT TẠO CÁC SCENES PHASE 2-5 (GIỮ NGUYÊN BẢN PHASE 1 TỪ GIT) VÀ ĐĂNG KÝ BUILD SETTINGS!");
+            Debug.Log("==> HOĂ€N Táº¤T Táº O CĂC SCENES PHASE 2-5 (GIá»® NGUYĂN Báº¢N PHASE 1 Tá»ª GIT) VĂ€ ÄÄ‚NG KĂ BUILD SETTINGS!");
             if (!Application.isBatchMode)
             {
-                EditorUtility.DisplayDialog("Thành công!", "Đã thiết lập xong các Phase 2-5 và đăng ký Build Settings (Phase 1 giữ nguyên bản từ Git) thành công!", "Đồng ý");
+                EditorUtility.DisplayDialog("ThĂ nh cĂ´ng!", "ÄĂ£ thiáº¿t láº­p xong cĂ¡c Phase 2-5 vĂ  Ä‘Äƒng kĂ½ Build Settings (Phase 1 giá»¯ nguyĂªn báº£n tá»« Git) thĂ nh cĂ´ng!", "Äá»“ng Ă½");
             }
         }
 
@@ -359,7 +400,7 @@ namespace RungTramTraSu
             river.GetComponent<Renderer>().sharedMaterial = waterMat;
 
             // Boat
-            GameObject boat = LoadAndInstantiate("Assets/Models/VietnameseBoat/mô+hình+thuyền+sampan+gỗ+3d.glb", "Sampan Boat", new Vector3(25f, -0.82f, -55f), Quaternion.Euler(0f, -90f, 0f));
+            GameObject boat = LoadAndInstantiate("Assets/Models/VietnameseBoat/mĂ´+hĂ¬nh+thuyá»n+sampan+gá»—+3d.glb", "Sampan Boat", new Vector3(25f, -0.82f, -55f), Quaternion.Euler(0f, -90f, 0f));
             if (boat != null)
             {
                 boat.transform.localScale = new Vector3(5f, 5f, 5f);
@@ -367,14 +408,14 @@ namespace RungTramTraSu
                 var wf = boat.AddComponent<WaterFloat>();
                 wf.initialYOffset = 0.32f;
 
-                // Thêm Ông Ngoại ngồi ở mũi thuyền chèo xuồng
+                // ThĂªm Ă”ng Ngoáº¡i ngá»“i á»Ÿ mÅ©i thuyá»n chĂ¨o xuá»“ng
                 GameObject grandpa = LoadAndInstantiate("Assets/Models/VietnameseGrandpa/Meshy_AI_Old_Man_with_Open_Arm_biped/Meshy_AI_Old_Man_with_Open_Arm_biped_Character_output.glb", "Grandpa_NPC", Vector3.zero, Quaternion.identity);
                 if (grandpa != null)
                 {
                     grandpa.transform.SetParent(boat.transform, false);
-                    // Bù trừ tỷ lệ scale 5x của thuyền (giữ kích thước của ông ngoại ở mức 0.85x chuẩn trong thế giới thực)
+                    // BĂ¹ trá»« tá»· lá»‡ scale 5x cá»§a thuyá»n (giá»¯ kĂ­ch thÆ°á»›c cá»§a Ă´ng ngoáº¡i á»Ÿ má»©c 0.85x chuáº©n trong tháº¿ giá»›i thá»±c)
                     grandpa.transform.localScale = new Vector3(0.85f / 5f, 0.85f / 5f, 0.85f / 5f);
-                    // Đặt ông ngoại ở đầu thuyền, quay mặt về phía trước cùng chiều di chuyển
+                    // Äáº·t Ă´ng ngoáº¡i á»Ÿ Ä‘áº§u thuyá»n, quay máº·t vá» phĂ­a trÆ°á»›c cĂ¹ng chiá»u di chuyá»ƒn
                     grandpa.transform.localPosition = new Vector3(1.5f / 5f, 0.3f / 5f, 0f);
                     grandpa.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
 
@@ -397,8 +438,8 @@ namespace RungTramTraSu
             woodMat.color = new Color(0.32f, 0.2f, 0.11f);
             startPier.GetComponent<Renderer>().sharedMaterial = woodMat;
 
-            // Biển báo gỗ mộc mạc đầu kênh dẫn
-            CreateScenicWoodenSign("Kênh Dẫn Trà Sư\n(Mùa Nước Nổi)", new Vector3(22f, -0.4f, -54f), -30f);
+            // Biá»ƒn bĂ¡o gá»— má»™c máº¡c Ä‘áº§u kĂªnh dáº«n
+            CreateScenicWoodenSign("KĂªnh Dáº«n TrĂ  SÆ°\n(MĂ¹a NÆ°á»›c Ná»•i)", new Vector3(22f, -0.4f, -54f), -30f);
 
             GameObject endPier = GameObject.CreatePrimitive(PrimitiveType.Cube);
             endPier.name = "EndPier";
@@ -430,7 +471,7 @@ namespace RungTramTraSu
                     forestTree.transform.localScale = new Vector3(rndScale, rndScale, rndScale);
                     forestTree.AddComponent<WindSway>();
 
-                    // Thêm rễ thở và cò trắng
+                    // ThĂªm rá»… thá»Ÿ vĂ  cĂ² tráº¯ng
                     CreateBreathingRootsAroundTree(new Vector3(xPos, yPos + 3.5f, zPos), forestContainer.transform, Random.Range(2, 6));
                     CreateBirdInTree(new Vector3(xPos, yPos + 3.5f, zPos), forestTree.transform);
                 }
@@ -454,7 +495,7 @@ namespace RungTramTraSu
                 DestroyImmediate(pad.GetComponent<Collider>());
                 pad.GetComponent<Renderer>().sharedMaterial = lilyMat;
 
-                // Sinh hoa súng hồng rực rỡ nổi trên thảm bèo xanh
+                // Sinh hoa sĂºng há»“ng rá»±c rá»¡ ná»•i trĂªn tháº£m bĂ¨o xanh
                 if (Random.value < 0.35f)
                 {
                     CreateLotusFlower(new Vector3(xPos, yPos, zPos), pad.transform);
@@ -582,12 +623,8 @@ namespace RungTramTraSu
             cameraData.renderPostProcessing = true;
             var photoCam = camObj.AddComponent<PhotoCamera>();
 
-            GameObject cameraHandModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cameraHandModel.name = "CameraHandModel";
-            cameraHandModel.transform.SetParent(camObj.transform, false);
-            cameraHandModel.transform.localPosition = new Vector3(0.2f, -0.25f, 0.4f);
-            cameraHandModel.transform.localScale = new Vector3(0.12f, 0.08f, 0.1f);
-            DestroyImmediate(cameraHandModel.GetComponent<BoxCollider>());
+            // Dung model may anh phim cu thay vi Cube placeholder
+            GameObject cameraHandModel = CreateCameraHandModel(camObj.transform);
 
             SerializedObject serPlayer = new SerializedObject(playerCtrl);
             serPlayer.FindProperty("playerCamera").objectReferenceValue = camObj.transform;
@@ -748,8 +785,8 @@ namespace RungTramTraSu
                 }
             }
 
-            // Biển báo gỗ mộc mạc tại cầu tre
-            CreateScenicWoodenSign("Cầu Tre Vạn Bước\n(Lõi Rừng Tràm)", new Vector3(5f + Mathf.Sin(-45f * 0.12f) * 6f - 2f, -0.3f, -48f), 15f);
+            // Biá»ƒn bĂ¡o gá»— má»™c máº¡c táº¡i cáº§u tre
+            CreateScenicWoodenSign("Cáº§u Tre Váº¡n BÆ°á»›c\n(LĂµi Rá»«ng TrĂ m)", new Vector3(5f + Mathf.Sin(-45f * 0.12f) * 6f - 2f, -0.3f, -48f), 15f);
 
             // Spawning 150 dense trees (Deep forest feel)
             Random.InitState(9999);
@@ -768,7 +805,7 @@ namespace RungTramTraSu
                     forestTree.transform.localScale = new Vector3(rndScale, rndScale, rndScale);
                     forestTree.AddComponent<WindSway>();
 
-                    // Phát triển ngoại cảnh: Rễ thở tràm sinh ngẫu nhiên quanh gốc và cò trắng đậu trên ngọn
+                    // PhĂ¡t triá»ƒn ngoáº¡i cáº£nh: Rá»… thá»Ÿ trĂ m sinh ngáº«u nhiĂªn quanh gá»‘c vĂ  cĂ² tráº¯ng Ä‘áº­u trĂªn ngá»n
                     CreateBreathingRootsAroundTree(new Vector3(xPos, -1.8f + 3.5f, zPos), forestContainer.transform, Random.Range(2, 6));
                     CreateBirdInTree(new Vector3(xPos, -1.8f + 3.5f, zPos), forestTree.transform);
 
@@ -867,12 +904,8 @@ namespace RungTramTraSu
             cameraData.renderPostProcessing = true;
             var photoCam = camObj.AddComponent<PhotoCamera>();
 
-            GameObject cameraHandModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cameraHandModel.name = "CameraHandModel";
-            cameraHandModel.transform.SetParent(camObj.transform, false);
-            cameraHandModel.transform.localPosition = new Vector3(0.2f, -0.25f, 0.4f);
-            cameraHandModel.transform.localScale = new Vector3(0.12f, 0.08f, 0.1f);
-            DestroyImmediate(cameraHandModel.GetComponent<BoxCollider>());
+            // Dung model may anh phim cu thay vi Cube placeholder
+            GameObject cameraHandModel = CreateCameraHandModel(camObj.transform);
 
             SerializedObject serPlayer = new SerializedObject(playerCtrl);
             serPlayer.FindProperty("playerCamera").objectReferenceValue = camObj.transform;
@@ -884,8 +917,8 @@ namespace RungTramTraSu
 
             GameObject gameUI = CreateBaseGameUI(photoCam, cameraHandModel, out TextMeshProUGUI objText);
 
-            // Chiếc xuồng ba lá (Sampan Boat) neo sát bến để tự động trôi dọc kênh
-            GameObject boat = LoadAndInstantiate("Assets/Models/VietnameseBoat/mô+hình+thuyền+sampan+gỗ+3d.glb", "Sampan Boat", new Vector3(startX - 3.5f, -0.82f, -45f), Quaternion.Euler(0f, -90f, 0f));
+            // Chiáº¿c xuá»“ng ba lĂ¡ (Sampan Boat) neo sĂ¡t báº¿n Ä‘á»ƒ tá»± Ä‘á»™ng trĂ´i dá»c kĂªnh
+            GameObject boat = LoadAndInstantiate("Assets/Models/VietnameseBoat/mĂ´+hĂ¬nh+thuyá»n+sampan+gá»—+3d.glb", "Sampan Boat", new Vector3(startX - 3.5f, -0.82f, -45f), Quaternion.Euler(0f, -90f, 0f));
             if (boat != null)
             {
                 boat.transform.localScale = new Vector3(5f, 5f, 5f);
@@ -894,7 +927,7 @@ namespace RungTramTraSu
                 wf.initialYOffset = 0.32f;
             }
 
-            // Grandpa NPC đứng trên thuyền
+            // Grandpa NPC Ä‘á»©ng trĂªn thuyá»n
             GameObject grandpa = LoadAndInstantiate("Assets/Models/VietnameseGrandpa/Meshy_AI_Old_Man_with_Open_Arm_biped/Meshy_AI_Old_Man_with_Open_Arm_biped_Character_output.glb", "Grandpa_NPC", Vector3.zero, Quaternion.identity);
             if (grandpa != null)
             {
@@ -1035,9 +1068,9 @@ namespace RungTramTraSu
             DestroyImmediate(water.GetComponent<MeshCollider>());
             water.GetComponent<Renderer>().sharedMaterial = waterMat;
 
-            // Biển báo gỗ mộc mạc tại khu bảo tồn
+            // Biá»ƒn bĂ¡o gá»— má»™c máº¡c táº¡i khu báº£o tá»“n
             float signY = GetHeightAt(22f, -46f);
-            CreateScenicWoodenSign("Khu Bảo Tồn Đầm Lầy\n(Yêu Cầu Đi Nhẹ Nói Khẽ)", new Vector3(22f, signY, -46f), 10f);
+            CreateScenicWoodenSign("Khu Báº£o Tá»“n Äáº§m Láº§y\n(YĂªu Cáº§u Äi Nháº¹ NĂ³i Kháº½)", new Vector3(22f, signY, -46f), 10f);
 
             // Spawning 150 cajuput trees (dense sanctuary forest!)
             Random.InitState(777);
@@ -1063,7 +1096,7 @@ namespace RungTramTraSu
                     forestTree.transform.localScale = new Vector3(rndScale, rndScale, rndScale);
                     forestTree.AddComponent<WindSway>();
 
-                    // Phát triển ngoại cảnh: Rễ thở tràm sinh ngẫu nhiên quanh gốc và cò trắng đậu trên ngọn
+                    // PhĂ¡t triá»ƒn ngoáº¡i cáº£nh: Rá»… thá»Ÿ trĂ m sinh ngáº«u nhiĂªn quanh gá»‘c vĂ  cĂ² tráº¯ng Ä‘áº­u trĂªn ngá»n
                     CreateBreathingRootsAroundTree(new Vector3(xPos, -1.8f + 3.5f, zPos), forestContainer.transform, Random.Range(2, 6));
                     CreateBirdInTree(new Vector3(xPos, -1.8f + 3.5f, zPos), forestTree.transform);
                     
@@ -1134,12 +1167,8 @@ namespace RungTramTraSu
             cameraData.renderPostProcessing = true;
             var photoCam = camObj.AddComponent<PhotoCamera>();
 
-            GameObject cameraHandModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cameraHandModel.name = "CameraHandModel";
-            cameraHandModel.transform.SetParent(camObj.transform, false);
-            cameraHandModel.transform.localPosition = new Vector3(0.2f, -0.25f, 0.4f);
-            cameraHandModel.transform.localScale = new Vector3(0.12f, 0.08f, 0.1f);
-            DestroyImmediate(cameraHandModel.GetComponent<BoxCollider>());
+            // Dung model may anh phim cu thay vi Cube placeholder
+            GameObject cameraHandModel = CreateCameraHandModel(camObj.transform);
 
             SerializedObject serPlayer = new SerializedObject(playerCtrl);
             serPlayer.FindProperty("playerCamera").objectReferenceValue = camObj.transform;
@@ -1257,7 +1286,7 @@ namespace RungTramTraSu
                 col.height = 4.0f;
             }
 
-            // 6 con cò trắng lội trong kênh rải đều theo chiều dài
+            // 6 con cĂ² tráº¯ng lá»™i trong kĂªnh ráº£i Ä‘á»u theo chiá»u dĂ i
             spawnAnimal("WadingStork_1", AnimalAI.AnimalType.Stork, new Vector3(20f, -0.3f, -25f), 3.0f, 3f);
             spawnAnimal("WadingStork_2", AnimalAI.AnimalType.Stork, new Vector3(22f, -0.3f, -12f), 3.0f, 3f);
             spawnAnimal("WadingStork_3", AnimalAI.AnimalType.Stork, new Vector3(21f, -0.3f,  -2f), 3.0f, 3f);
@@ -1285,22 +1314,22 @@ namespace RungTramTraSu
 
             // Spawn wooden signs as visual checkpoint indicators for each animal habitat
             float snakeSignY = GetHeightAt(18f, -22f);
-            CreateScenicWoodenSign("Đầm Rắn Nước", new Vector3(18f, snakeSignY, -22f), 45f);
+            CreateScenicWoodenSign("Äáº§m Ráº¯n NÆ°á»›c", new Vector3(18f, snakeSignY, -22f), 45f);
 
             float stork1SignY = GetHeightAt(17f, -12f);
-            CreateScenicWoodenSign("Nơi Cò Trắng Đậu", new Vector3(17f, stork1SignY, -12f), -45f);
+            CreateScenicWoodenSign("NÆ¡i CĂ² Tráº¯ng Äáº­u", new Vector3(17f, stork1SignY, -12f), -45f);
 
             float fishSignY = GetHeightAt(15f, -4f);
-            CreateScenicWoodenSign("Vùng Cá Lóc Nhảy", new Vector3(15f, fishSignY, -4f), 90f);
+            CreateScenicWoodenSign("VĂ¹ng CĂ¡ LĂ³c Nháº£y", new Vector3(15f, fishSignY, -4f), 90f);
 
             float duckSignY = GetHeightAt(20f, 6f);
-            CreateScenicWoodenSign("Đầm Vịt Trời", new Vector3(20f, duckSignY, 6f), -90f);
+            CreateScenicWoodenSign("Äáº§m Vá»‹t Trá»i", new Vector3(20f, duckSignY, 6f), -90f);
 
             float butterflySignY = GetHeightAt(13f, 8f);
-            CreateScenicWoodenSign("Bướm Hoa Súng", new Vector3(13f, butterflySignY, 8f), 0f);
+            CreateScenicWoodenSign("BÆ°á»›m Hoa SĂºng", new Vector3(13f, butterflySignY, 8f), 0f);
 
             float stork2SignY = GetHeightAt(23f, 15f);
-            CreateScenicWoodenSign("Nơi Cò Trắng Đậu 2", new Vector3(23f, stork2SignY, 15f), 180f);
+            CreateScenicWoodenSign("NÆ¡i CĂ² Tráº¯ng Äáº­u 2", new Vector3(23f, stork2SignY, 15f), 180f);
 
             // Managers
             GameObject managersObj = new GameObject("Managers");
@@ -1584,9 +1613,9 @@ namespace RungTramTraSu
             roofRight.transform.localScale = new Vector3(4.2f, 0.15f, 8.0f);
             roofRight.GetComponent<Renderer>().sharedMaterial = activeWoodMat;
 
-            // Biển báo gỗ mộc mạc tại vọng cảnh đài
+            // Biá»ƒn bĂ¡o gá»— má»™c máº¡c táº¡i vá»ng cáº£nh Ä‘Ă i
             float signY = SceneBeautifierAll.GetPhase5HeightAt(towerCenter.x + 3f, 10f);
-            CreateScenicWoodenSign("Vọng Cảnh Đài\n(Đỉnh Kính Vọng)", new Vector3(towerCenter.x + 3f, signY, 10f), -20f);
+            CreateScenicWoodenSign("Vá»ng Cáº£nh ÄĂ i\n(Äá»‰nh KĂ­nh Vá»ng)", new Vector3(towerCenter.x + 3f, signY, 10f), -20f);
 
             // Spawning 120 trees surrounding the clearing (circle boundary forest)
             Random.InitState(888);
@@ -1607,7 +1636,7 @@ namespace RungTramTraSu
                     forestTree.transform.localScale = new Vector3(rndScale, rndScale, rndScale);
                     forestTree.AddComponent<WindSway>();
 
-                    // Phát triển ngoại cảnh: Rễ thở tràm sinh ngẫu nhiên quanh gốc và cò trắng đậu trên ngọn
+                    // PhĂ¡t triá»ƒn ngoáº¡i cáº£nh: Rá»… thá»Ÿ trĂ m sinh ngáº«u nhiĂªn quanh gá»‘c vĂ  cĂ² tráº¯ng Ä‘áº­u trĂªn ngá»n
                     CreateBreathingRootsAroundTree(new Vector3(xPos, yPos + 3.5f, zPos), forestContainer.transform, Random.Range(2, 6));
                     CreateBirdInTree(new Vector3(xPos, yPos + 3.5f, zPos), forestTree.transform);
                 }
@@ -1651,12 +1680,8 @@ namespace RungTramTraSu
             cameraData.renderPostProcessing = true;
             var photoCam = camObj.AddComponent<PhotoCamera>();
 
-            GameObject cameraHandModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cameraHandModel.name = "CameraHandModel";
-            cameraHandModel.transform.SetParent(camObj.transform, false);
-            cameraHandModel.transform.localPosition = new Vector3(0.2f, -0.25f, 0.4f);
-            cameraHandModel.transform.localScale = new Vector3(0.12f, 0.08f, 0.1f);
-            DestroyImmediate(cameraHandModel.GetComponent<BoxCollider>());
+            // Dung model may anh phim cu thay vi Cube placeholder
+            GameObject cameraHandModel = CreateCameraHandModel(camObj.transform);
 
             SerializedObject serPlayer = new SerializedObject(playerCtrl);
             serPlayer.FindProperty("playerCamera").objectReferenceValue = camObj.transform;
@@ -1734,7 +1759,7 @@ namespace RungTramTraSu
             var dText = diaryTextObj.AddComponent<TextMeshProUGUI>();
             dText.fontSize = 20;
             dText.color = new Color(0.95f, 0.9f, 0.82f);
-            dText.text = "Cuốn sổ nhật ký hành trình...";
+            dText.text = "Cuá»‘n sá»• nháº­t kĂ½ hĂ nh trĂ¬nh...";
 
             GameObject replayBtnObj = new GameObject("ReplayButton");
             replayBtnObj.transform.SetParent(bgPanel.transform, false);
@@ -1756,7 +1781,7 @@ namespace RungTramTraSu
             btRect.offsetMin = Vector2.zero;
             btRect.offsetMax = Vector2.zero;
             var btText = btnTextObj.AddComponent<TextMeshProUGUI>();
-            btText.text = "Chơi Lại";
+            btText.text = "ChÆ¡i Láº¡i";
             btText.fontSize = 18;
             btText.alignment = TextAlignmentOptions.Center;
             btText.color = Color.white;
@@ -1816,7 +1841,7 @@ namespace RungTramTraSu
             promptText.alignment = TextAlignmentOptions.Center;
             promptText.fontSize = 20;
             promptText.color = Color.yellow;
-            promptText.text = "[E] Nói chuyện";
+            promptText.text = "[E] NĂ³i chuyá»‡n";
 
             SerializedObject serIntUI = new SerializedObject(interactUI);
             serIntUI.FindProperty("promptPanel").objectReferenceValue = promptPanel;
@@ -1836,7 +1861,7 @@ namespace RungTramTraSu
             objText.alignment = TextAlignmentOptions.Center;
             objText.fontSize = 22;
             objText.color = Color.white;
-            objText.text = "Mục tiêu: Đang cập nhật...";
+            objText.text = "Má»¥c tiĂªu: Äang cáº­p nháº­t...";
             objectiveTextOut = objText;
 
             GameObject viewfinderCanvas = new GameObject("ViewfinderCanvas");
@@ -1855,17 +1880,6 @@ namespace RungTramTraSu
             var borderImg = borderObj.AddComponent<Image>();
             borderImg.color = new Color(0, 0, 0, 0.4f);
 
-            GameObject recTextObj = new GameObject("RECText");
-            recTextObj.transform.SetParent(viewfinderCanvas.transform, false);
-            var recRect = recTextObj.AddComponent<RectTransform>();
-            recRect.anchorMin = new Vector2(0.1f, 0.9f);
-            recRect.anchorMax = new Vector2(0.1f, 0.9f);
-            recRect.anchoredPosition = Vector2.zero;
-            recRect.sizeDelta = new Vector2(100, 30);
-            var recText = recTextObj.AddComponent<TextMeshProUGUI>();
-            recText.text = "● REC";
-            recText.color = Color.red;
-            recText.fontSize = 20;
 
             GameObject flashObj = new GameObject("FlashImage");
             flashObj.transform.SetParent(gameUI.transform, false);
@@ -1906,7 +1920,7 @@ namespace RungTramTraSu
             var spkText = speakerTextObj.AddComponent<TextMeshProUGUI>();
             spkText.fontSize = 20;
             spkText.color = Color.green;
-            spkText.text = "Ông Ngoại";
+            spkText.text = "Ă”ng Ngoáº¡i";
 
             GameObject dialogueTextObj = new GameObject("DialogueText");
             dialogueTextObj.transform.SetParent(diagPanel.transform, false);
@@ -1918,7 +1932,7 @@ namespace RungTramTraSu
             var diagTextComp = dialogueTextObj.AddComponent<TextMeshProUGUI>();
             diagTextComp.fontSize = 18;
             diagTextComp.color = Color.white;
-            diagTextComp.text = "Đang chạy lời thoại...";
+            diagTextComp.text = "Äang cháº¡y lá»i thoáº¡i...";
 
             GameObject continueIndicator = new GameObject("ContinueIndicator");
             continueIndicator.transform.SetParent(diagPanel.transform, false);
@@ -1931,7 +1945,7 @@ namespace RungTramTraSu
             var cntText = continueIndicator.AddComponent<TextMeshProUGUI>();
             cntText.fontSize = 14;
             cntText.color = Color.gray;
-            cntText.text = "[Click / Space] Tiếp tục";
+            cntText.text = "[Click / Space] Tiáº¿p tá»¥c";
 
             GameObject faderCanvasObj = new GameObject("FaderCanvas");
             var faderCanvas = faderCanvasObj.AddComponent<Canvas>();
@@ -1961,13 +1975,13 @@ namespace RungTramTraSu
 
         private static void SetupPostProcessingAndFog(GameObject camObj)
         {
-            // 1. Cấu hình Fog (Sương mù buổi sáng vùng sông nước miền Tây)
+            // 1. Cáº¥u hĂ¬nh Fog (SÆ°Æ¡ng mĂ¹ buá»•i sĂ¡ng vĂ¹ng sĂ´ng nÆ°á»›c miá»n TĂ¢y)
             RenderSettings.fog = true;
-            RenderSettings.fogColor = new Color(0.6f, 0.78f, 0.72f); // Sương mù trà xanh nhạt
+            RenderSettings.fogColor = new Color(0.6f, 0.78f, 0.72f); // SÆ°Æ¡ng mĂ¹ trĂ  xanh nháº¡t
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.015f; // Độ đậm sương mù nhẹ nhàng thanh thoát
+            RenderSettings.fogDensity = 0.015f; // Äá»™ Ä‘áº­m sÆ°Æ¡ng mĂ¹ nháº¹ nhĂ ng thanh thoĂ¡t
 
-            // 2. Áp dụng Skybox
+            // 2. Ăp dá»¥ng Skybox
             Material skyboxMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
             if (skyboxMat != null)
             {
@@ -1975,20 +1989,20 @@ namespace RungTramTraSu
             }
             else
             {
-                Debug.LogWarning("Không tìm thấy Skybox material tại Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
+                Debug.LogWarning("KhĂ´ng tĂ¬m tháº¥y Skybox material táº¡i Assets/EmaceArt/Slavic World Free/Skybox/Epic_BigCloudsSoft_V2/EA03_LowPolyBigClouds.mat");
             }
 
-            // 3. Cấu hình Ambient fill light để tránh bóng đổ quá đen tối màu (sử dụng Skybox cho trung thực)
+            // 3. Cáº¥u hĂ¬nh Ambient fill light Ä‘á»ƒ trĂ¡nh bĂ³ng Ä‘á»• quĂ¡ Ä‘en tá»‘i mĂ u (sá»­ dá»¥ng Skybox cho trung thá»±c)
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
             RenderSettings.ambientIntensity = 1.25f;
             DynamicGI.UpdateEnvironment();
 
-            // 4. Tạo đối tượng Global Volume chứa hậu kỳ
+            // 4. Táº¡o Ä‘á»‘i tÆ°á»£ng Global Volume chá»©a háº­u ká»³
             GameObject volumeObj = new GameObject("Global PostProcess Volume");
             var volume = volumeObj.AddComponent<Volume>();
             volume.isGlobal = true;
 
-            // Tải Volume Profile từ disk hoặc tạo mới nếu chưa tồn tại
+            // Táº£i Volume Profile tá»« disk hoáº·c táº¡o má»›i náº¿u chÆ°a tá»“n táº¡i
             string profilePath = "Assets/Scenes/Phase1_VolumeProfile.asset";
             VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath);
             if (profile == null)
@@ -2000,7 +2014,7 @@ namespace RungTramTraSu
                 tonemapping.active = true;
                 tonemapping.mode.Override(TonemappingMode.ACES);
 
-                // - Bloom (Nắng vàng tỏa rực rỡ qua sương sớm)
+                // - Bloom (Náº¯ng vĂ ng tá»a rá»±c rá»¡ qua sÆ°Æ¡ng sá»›m)
                 var bloom = profile.Add<Bloom>();
                 bloom.active = true;
                 bloom.threshold.Override(0.78f);
@@ -2008,7 +2022,7 @@ namespace RungTramTraSu
                 bloom.scatter.Override(0.72f);
                 bloom.tint.Override(new Color(1f, 0.94f, 0.80f));
 
-                // - Color Adjustments (Nâng độ rực và tương phản của bèo xanh, cỏ cây)
+                // - Color Adjustments (NĂ¢ng Ä‘á»™ rá»±c vĂ  tÆ°Æ¡ng pháº£n cá»§a bĂ¨o xanh, cá» cĂ¢y)
                 var colorAdjust = profile.Add<ColorAdjustments>();
                 colorAdjust.active = true;
                 colorAdjust.contrast.Override(25f);
@@ -2050,7 +2064,7 @@ namespace RungTramTraSu
             outline.effectColor = new Color(0.85f, 0.65f, 0.15f, 0.5f);
             outline.effectDistance = new Vector2(1.5f, 1.5f);
 
-            // --- Cột trái: icon máy ảnh ---
+            // --- Cá»™t trĂ¡i: icon mĂ¡y áº£nh ---
             GameObject iconContainer = new GameObject("LeftColumn");
             iconContainer.transform.SetParent(cameraPopupPanel.transform, false);
             var iconRect2 = iconContainer.AddComponent<RectTransform>();
@@ -2063,7 +2077,7 @@ namespace RungTramTraSu
             leftOutline.effectColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
             leftOutline.effectDistance = new Vector2(1f, 1f);
 
-            // Load sprite máy ảnh
+            // Load sprite mĂ¡y áº£nh
             var camSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Textures/UI/CameraItemIcon.png");
             if (camSprite != null) {
                 GameObject camImgObj = new GameObject("CameraImage");
@@ -2078,7 +2092,7 @@ namespace RungTramTraSu
                 cImg.preserveAspect = true;
             }
 
-            // Badge "VẬT PHẨM MỚI!"
+            // Badge "Váº¬T PHáº¨M Má»I!"
             GameObject badge = new GameObject("NewItemBadge");
             badge.transform.SetParent(iconContainer.transform, false);
             var badgeRect = badge.AddComponent<RectTransform>();
@@ -2093,13 +2107,13 @@ namespace RungTramTraSu
             var btR = badgeTxtObj.AddComponent<RectTransform>();
             btR.anchorMin = Vector2.zero; btR.anchorMax = Vector2.one; btR.sizeDelta = Vector2.zero;
             var btT = badgeTxtObj.AddComponent<TextMeshProUGUI>();
-            btT.text = "VẬT PHẨM MỚI!";
+            btT.text = "Váº¬T PHáº¨M Má»I!";
             btT.fontSize = 11f;
             btT.fontStyle = FontStyles.Bold;
             btT.color = new Color(0.05f, 0.05f, 0.05f);
             btT.alignment = TextAlignmentOptions.Center;
 
-            // --- Cột phải: Content Container ---
+            // --- Cá»™t pháº£i: Content Container ---
             GameObject rightCol = new GameObject("RightColumn");
             rightCol.transform.SetParent(cameraPopupPanel.transform, false);
             var rightRect = rightCol.AddComponent<RectTransform>();
@@ -2117,7 +2131,7 @@ namespace RungTramTraSu
             titleRect.offsetMin = Vector2.zero;
             titleRect.offsetMax = Vector2.zero;
             var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-            titleText.text = "NHẬN MÁY ẢNH PHIM CŨ";
+            titleText.text = "NHáº¬N MĂY áº¢NH PHIM CÅ¨";
             titleText.fontSize = 18;
             titleText.fontStyle = FontStyles.Bold;
             titleText.color = new Color(0.95f, 0.75f, 0.1f);
@@ -2144,7 +2158,7 @@ namespace RungTramTraSu
             descRect.offsetMin = Vector2.zero;
             descRect.offsetMax = new Vector2(0f, -6f);
             var descText = descObj.AddComponent<TextMeshProUGUI>();
-            descText.text = "Máy ảnh phim cũ ba mua hồi năm ngoái.\nVẫn còn xài tốt nhưng ống kính hơi rít...\n\n<color=#FFD700><b>Hướng dẫn sử dụng:</b></color>\n• <b>[Chuột Phải]</b>: Ngắm ống kính\n• <b>[Chuột Trái]</b>: Chụp ảnh\n• <b>[Tab] / [I]</b>: Mở Sổ Nhật Ký";
+            descText.text = "MĂ¡y áº£nh phim cÅ© ba mua há»“i nÄƒm ngoĂ¡i.\nVáº«n cĂ²n xĂ i tá»‘t nhÆ°ng á»‘ng kĂ­nh hÆ¡i rĂ­t...\n\n<color=#FFD700><b>HÆ°á»›ng dáº«n sá»­ dá»¥ng:</b></color>\nâ€¢ <b>[Chuá»™t Pháº£i]</b>: Ngáº¯m á»‘ng kĂ­nh\nâ€¢ <b>[Chuá»™t TrĂ¡i]</b>: Chá»¥p áº£nh\nâ€¢ <b>[Tab] / [I]</b>: Má»Ÿ Sá»• Nháº­t KĂ½";
             descText.fontSize = 12.5f;
             descText.color = new Color(0.9f, 0.9f, 0.9f, 1f);
             descText.lineSpacing = 4f;
@@ -2173,7 +2187,7 @@ namespace RungTramTraSu
             htRect.anchorMax = Vector2.one;
             htRect.sizeDelta = Vector2.zero;
             var hintText = hintTxtGo.AddComponent<TextMeshProUGUI>();
-            hintText.text = "<color=#aaaaaa>Nhấn</color> <b>[ Chuột Trái ]</b> <color=#aaaaaa>hoặc</color> <b>[ Space ]</b> <color=#aaaaaa>để Đóng</color>";
+            hintText.text = "<color=#aaaaaa>Nháº¥n</color> <b>[ Chuá»™t TrĂ¡i ]</b> <color=#aaaaaa>hoáº·c</color> <b>[ Space ]</b> <color=#aaaaaa>Ä‘á»ƒ ÄĂ³ng</color>";
             hintText.fontSize = 11.5f;
             hintText.color = Color.white;
             hintText.alignment = TextAlignmentOptions.Center;
@@ -2181,7 +2195,7 @@ namespace RungTramTraSu
 
 
 
-            // 2. Build Sổ Nhật Ký (Diary UI)
+            // 2. Build Sá»• Nháº­t KĂ½ (Diary UI)
             GameObject diaryPanel = new GameObject("DiaryPanel");
             diaryPanel.transform.SetParent(gameUI.transform, false);
             diaryPanel.SetActive(false);
@@ -2204,7 +2218,7 @@ namespace RungTramTraSu
             dTitleRect.anchoredPosition = new Vector2(0, -30);
             dTitleRect.sizeDelta = new Vector2(600, 50);
             var dTitleText = dTitleObj.AddComponent<TextMeshProUGUI>();
-            dTitleText.text = "SỔ NHẬT KÝ HÀNH TRÌNH TRÀ SƯ";
+            dTitleText.text = "Sá»” NHáº¬T KĂ HĂ€NH TRĂŒNH TRĂ€ SÆ¯";
             dTitleText.fontSize = 28;
             dTitleText.fontStyle = FontStyles.Bold;
             dTitleText.color = new Color(0.95f, 0.85f, 0.6f);
@@ -2230,7 +2244,7 @@ namespace RungTramTraSu
             camInvTextRect.anchorMax = Vector2.one;
             camInvTextRect.sizeDelta = Vector2.zero;
             var camInvText = camInvTextObj.AddComponent<TextMeshProUGUI>();
-            camInvText.text = "📷 MÁY ẢNH";
+            camInvText.text = "đŸ“· MĂY áº¢NH";
             camInvText.fontSize = 16;
             camInvText.color = Color.white;
             camInvText.alignment = TextAlignmentOptions.Center;
@@ -2280,18 +2294,18 @@ namespace RungTramTraSu
             };
 
             // Layout row 1: 4 photos
-            RawImage rPhase1Mango = createPolaroidSlot("Cây Xoài Nhiệm Vụ", new Vector2(-300, 100)).GetComponent<RawImage>();
-            RawImage rPhase2Ch1 = createPolaroidSlot("Đàn Chim Điểm 1", new Vector2(-100, 100)).GetComponent<RawImage>();
-            RawImage rPhase2Ch2 = createPolaroidSlot("Đàn Chim Điểm 2", new Vector2(100, 100)).GetComponent<RawImage>();
-            RawImage rPhase2Ch3 = createPolaroidSlot("Đàn Chim Điểm 3", new Vector2(300, 100)).GetComponent<RawImage>();
+            RawImage rPhase1Mango = createPolaroidSlot("CĂ¢y XoĂ i Nhiá»‡m Vá»¥", new Vector2(-300, 100)).GetComponent<RawImage>();
+            RawImage rPhase2Ch1 = createPolaroidSlot("ÄĂ n Chim Äiá»ƒm 1", new Vector2(-100, 100)).GetComponent<RawImage>();
+            RawImage rPhase2Ch2 = createPolaroidSlot("ÄĂ n Chim Äiá»ƒm 2", new Vector2(100, 100)).GetComponent<RawImage>();
+            RawImage rPhase2Ch3 = createPolaroidSlot("ÄĂ n Chim Äiá»ƒm 3", new Vector2(300, 100)).GetComponent<RawImage>();
 
             // Layout row 2: 6 photos (smaller spacing)
-            RawImage rPhase4Stork = createPolaroidSlot("Cò Trắng", new Vector2(-375, -120)).GetComponent<RawImage>();
-            RawImage rPhase4Snake = createPolaroidSlot("Rắn Nước", new Vector2(-225, -120)).GetComponent<RawImage>();
-            RawImage rPhase4Fish = createPolaroidSlot("Cá Lóc Trà Sư", new Vector2(-75, -120)).GetComponent<RawImage>();
-            RawImage rPhase4Butterfly = createPolaroidSlot("Bướm Tràm", new Vector2(75, -120)).GetComponent<RawImage>();
-            RawImage rPhase4Duck = createPolaroidSlot("Vịt Trời", new Vector2(225, -120)).GetComponent<RawImage>();
-            RawImage rPhase5Sunset = createPolaroidSlot("Hoàng Hôn Trà Sư", new Vector2(375, -120)).GetComponent<RawImage>();
+            RawImage rPhase4Stork = createPolaroidSlot("CĂ² Tráº¯ng", new Vector2(-375, -120)).GetComponent<RawImage>();
+            RawImage rPhase4Snake = createPolaroidSlot("Ráº¯n NÆ°á»›c", new Vector2(-225, -120)).GetComponent<RawImage>();
+            RawImage rPhase4Fish = createPolaroidSlot("CĂ¡ LĂ³c TrĂ  SÆ°", new Vector2(-75, -120)).GetComponent<RawImage>();
+            RawImage rPhase4Butterfly = createPolaroidSlot("BÆ°á»›m TrĂ m", new Vector2(75, -120)).GetComponent<RawImage>();
+            RawImage rPhase4Duck = createPolaroidSlot("Vá»‹t Trá»i", new Vector2(225, -120)).GetComponent<RawImage>();
+            RawImage rPhase5Sunset = createPolaroidSlot("HoĂ ng HĂ´n TrĂ  SÆ°", new Vector2(375, -120)).GetComponent<RawImage>();
 
             // Link to DiaryUIController
             SerializedObject serController = new SerializedObject(diaryController);
@@ -2314,16 +2328,16 @@ namespace RungTramTraSu
         {
             GameObject flower = new GameObject("LotusFlower");
             flower.transform.SetParent(parent, false);
-            flower.transform.position = position + new Vector3(0f, 0.02f, 0f); // Hơi nhô lên trên lá bèo
+            flower.transform.position = position + new Vector3(0f, 0.02f, 0f); // HÆ¡i nhĂ´ lĂªn trĂªn lĂ¡ bĂ¨o
 
             Material petalMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            petalMat.color = new Color(0.96f, 0.52f, 0.74f); // Hồng nhạt hoa sen/súng
+            petalMat.color = new Color(0.96f, 0.52f, 0.74f); // Há»“ng nháº¡t hoa sen/sĂºng
             if (petalMat.HasProperty("_Smoothness")) petalMat.SetFloat("_Smoothness", 0.1f);
 
             Material centerMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            centerMat.color = new Color(1.0f, 0.84f, 0f); // Nhụy vàng
+            centerMat.color = new Color(1.0f, 0.84f, 0f); // Nhá»¥y vĂ ng
 
-            // Nhụy tròn ở giữa
+            // Nhá»¥y trĂ²n á»Ÿ giá»¯a
             GameObject center = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             center.name = "Pistil";
             center.transform.SetParent(flower.transform, false);
@@ -2332,7 +2346,7 @@ namespace RungTramTraSu
             center.GetComponent<Renderer>().sharedMaterial = centerMat;
             DestroyImmediate(center.GetComponent<Collider>());
 
-            // 6 cánh hoa xung quanh xếp tròn xòe
+            // 6 cĂ¡nh hoa xung quanh xáº¿p trĂ²n xĂ²e
             for (int i = 0; i < 6; i++)
             {
                 float angle = i * 60f * Mathf.Deg2Rad;
@@ -2354,26 +2368,26 @@ namespace RungTramTraSu
         private static void CreateBreathingRootsAroundTree(Vector3 treePosition, Transform parent, int count)
         {
             Material rootMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            rootMat.color = new Color(0.26f, 0.16f, 0.10f); // Nâu vỏ cây tràm
+            rootMat.color = new Color(0.26f, 0.16f, 0.10f); // NĂ¢u vá» cĂ¢y trĂ m
             if (rootMat.HasProperty("_Smoothness")) rootMat.SetFloat("_Smoothness", 0.05f);
 
             for (int i = 0; i < count; i++)
             {
-                // Sinh ngẫu nhiên vòng quanh gốc cây từ 0.6m đến 1.8m
+                // Sinh ngáº«u nhiĂªn vĂ²ng quanh gá»‘c cĂ¢y tá»« 0.6m Ä‘áº¿n 1.8m
                 float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
                 float distance = Random.Range(0.6f, 1.8f);
                 float x = treePosition.x + Mathf.Sin(angle) * distance;
                 float z = treePosition.z + Mathf.Cos(angle) * distance;
-                float y = -1.02f; // Chân rễ cắm dưới nước
+                float y = -1.02f; // ChĂ¢n rá»… cáº¯m dÆ°á»›i nÆ°á»›c
 
                 GameObject spike = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 spike.name = "BreathingRoot_Spike";
                 spike.transform.SetParent(parent, false);
 
-                float height = Random.Range(0.25f, 0.65f); // Cao khoảng 25cm - 65cm
+                float height = Random.Range(0.25f, 0.65f); // Cao khoáº£ng 25cm - 65cm
                 spike.transform.position = new Vector3(x, y + height * 0.5f, z);
 
-                float radius = Random.Range(0.04f, 0.09f); // Rễ thở nhỏ nhọn
+                float radius = Random.Range(0.04f, 0.09f); // Rá»… thá»Ÿ nhá» nhá»n
                 spike.transform.localScale = new Vector3(radius, height, radius);
                 spike.transform.rotation = Quaternion.Euler(Random.Range(-5f, 5f), 0f, Random.Range(-5f, 5f));
 
@@ -2384,7 +2398,7 @@ namespace RungTramTraSu
 
         private static void CreateBirdInTree(Vector3 treePosition, Transform parent)
         {
-            // Đã tắt sinh cò đậu trên cây theo yêu cầu của người dùng
+            // ÄĂ£ táº¯t sinh cĂ² Ä‘áº­u trĂªn cĂ¢y theo yĂªu cáº§u cá»§a ngÆ°á»i dĂ¹ng
         }
 
         private static void CreateScenicWoodenSign(string mainText, Vector3 position, float rotationY)
@@ -2394,10 +2408,10 @@ namespace RungTramTraSu
             signObj.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
 
             Material woodMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            woodMat.color = new Color(0.35f, 0.22f, 0.12f); // Gỗ nâu mộc mạc
+            woodMat.color = new Color(0.35f, 0.22f, 0.12f); // Gá»— nĂ¢u má»™c máº¡c
             if (woodMat.HasProperty("_Smoothness")) woodMat.SetFloat("_Smoothness", 0.05f);
 
-            // Cột biển
+            // Cá»™t biá»ƒn
             GameObject post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             post.name = "Post";
             post.transform.SetParent(signObj.transform, false);
@@ -2405,7 +2419,7 @@ namespace RungTramTraSu
             post.transform.localScale = new Vector3(0.12f, 1.6f, 0.12f);
             post.GetComponent<Renderer>().sharedMaterial = woodMat;
 
-            // Bảng gỗ biển
+            // Báº£ng gá»— biá»ƒn
             GameObject board = GameObject.CreatePrimitive(PrimitiveType.Cube);
             board.name = "Board";
             board.transform.SetParent(signObj.transform, false);
@@ -2413,10 +2427,10 @@ namespace RungTramTraSu
             board.transform.localScale = new Vector3(1.2f, 0.5f, 0.06f);
             board.GetComponent<Renderer>().sharedMaterial = woodMat;
 
-            // Canvas hiển thị chữ trong không gian 3D
+            // Canvas hiá»ƒn thá»‹ chá»¯ trong khĂ´ng gian 3D
             GameObject canvasObj = new GameObject("SignCanvas");
             canvasObj.transform.SetParent(board.transform, false);
-            canvasObj.transform.localPosition = new Vector3(0f, 0f, 0.04f); // Nhô ra trước biển
+            canvasObj.transform.localPosition = new Vector3(0f, 0f, 0.04f); // NhĂ´ ra trÆ°á»›c biá»ƒn
             canvasObj.transform.localRotation = Quaternion.identity;
 
             var canvas = canvasObj.AddComponent<Canvas>();
@@ -2434,7 +2448,7 @@ namespace RungTramTraSu
 
             var tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = mainText;
-            tmp.fontSize = 0.14f; // Kích thước chữ 3D chuẩn thế giới thực
+            tmp.fontSize = 0.14f; // KĂ­ch thÆ°á»›c chá»¯ 3D chuáº©n tháº¿ giá»›i thá»±c
             tmp.color = Color.yellow;
             tmp.alignment = TextAlignmentOptions.Center;
         }
@@ -2496,4 +2510,6 @@ namespace RungTramTraSu
         }
     }
 }
+
+
 

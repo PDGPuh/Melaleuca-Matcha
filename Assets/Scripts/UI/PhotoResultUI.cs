@@ -154,30 +154,16 @@ namespace RungTramTraSu
 
             yield return new WaitForSecondsRealtime(0.2f);
 
-            // Fetch Score details from current active camera parameters
+            // Fetch Score details directly from the last calculated score in CameraManager
             PhotoScoring.ScoreResult score = new PhotoScoring.ScoreResult();
             bool hasValidScore = false;
             
             if (CameraManager.Instance != null && !description.Contains("không nằm trong khung ngắm") && !description.Contains("Nhiệm vụ:"))
             {
-                var visible = WildlifeDetector.Instance.ScanForVisibleTargets();
-                if (visible.Count > 0)
-                {
-                    // Query score parameters
-                    float blur = CameraManager.Instance.FocusSys.GetBlurFactor(visible[0].distance, CameraManager.Instance.ExpSys.CurrentAperture);
-                    score = PhotoScoring.Instance.CalculateScore(
-                        visible[0],
-                        CameraManager.Instance.FocusSys.CurrentFocusDistance,
-                        blur,
-                        CameraManager.Instance.ExpSys.GetExposureError(),
-                        CameraManager.Instance.ExpSys.CurrentShutterValue,
-                        CameraManager.Instance.ExpSys.CurrentAperture,
-                        CameraManager.Instance.ExpSys.CurrentISO,
-                        CameraManager.Instance.IsManualMode
-                    );
-                    hasValidScore = true;
-                }
+                score = CameraManager.Instance.LastScore;
+                hasValidScore = true;
             }
+
 
             // Type Subject Name
             if (subjectNameText != null)

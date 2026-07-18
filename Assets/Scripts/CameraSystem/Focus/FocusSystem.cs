@@ -126,18 +126,46 @@ namespace RungTramTraSu.CameraSystem
                 }
                 else if (activeFocusMode == FocusMode.ContinuousAF || activeFocusMode == FocusMode.SingleAF)
                 {
-                    // Focus on whatever is in the center of the frame (including triggers to detect quest targets like the Mango Tree)
-                    RaycastHit hit;
-                    Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-                    if (Physics.Raycast(ray, out hit, maxFocusDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
+                    // Lấy nét thông minh: ưu tiên các con vật đang nằm gần tâm ống kính (trong phạm vi 50% tâm)
+                    bool autoFocusTargetFound = false;
+                    if (WildlifeDetector.Instance != null)
                     {
-                        targetFocusDistance = hit.distance;
+                        var targets = WildlifeDetector.Instance.ScanForVisibleTargets();
+                        float bestOffset = float.MaxValue;
+                        float bestDist = 10f;
+                        foreach (var target in targets)
+                        {
+                            if (target.isOccluded) continue;
+                            float offset = Mathf.Abs(target.viewportPos.x - 0.5f) + Mathf.Abs(target.viewportPos.y - 0.5f);
+                            if (offset < 0.25f && offset < bestOffset) // nằm trong vùng ngắm trung tâm
+                            {
+                                bestOffset = offset;
+                                bestDist = target.distance;
+                                autoFocusTargetFound = true;
+                            }
+                        }
+                        if (autoFocusTargetFound)
+                        {
+                            targetFocusDistance = bestDist;
+                        }
                     }
-                    else
+
+                    if (!autoFocusTargetFound)
                     {
-                        targetFocusDistance = maxFocusDistance;
+                        // Focus on whatever is in the center of the frame (including triggers to detect quest targets like the Mango Tree)
+                        RaycastHit hit;
+                        Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+                        if (Physics.Raycast(ray, out hit, maxFocusDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
+                        {
+                            targetFocusDistance = hit.distance;
+                        }
+                        else
+                        {
+                            targetFocusDistance = maxFocusDistance;
+                        }
                     }
                 }
+
             }
 
             // Smoothly move focusing mechanics

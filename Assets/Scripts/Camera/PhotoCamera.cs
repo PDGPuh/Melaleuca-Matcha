@@ -59,12 +59,97 @@ namespace RungTramTraSu
                 PhotoCapture.Instance.OnFlashTriggered += TriggerFlashEffects;
             }
 
+            // Remove legacy "RECText" UI element if present in existing scenes
+            GameObject recText = GameObject.Find("RECText");
+            if (recText != null)
+            {
+                Destroy(recText);
+            }
+
+            // Runtime swap: thay CameraHandModel Cube cũ bằng model máy ảnh phim cổ thực tế
+            SwapCameraHandModel();
+
             // Sync initial states
             string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
             if (sceneName.Contains("Phase3") || sceneName.Contains("Phase4") || sceneName.Contains("Phase5"))
             {
                 UnlockCamera();
             }
+        }
+
+        private bool _cameraModelSwapped = false;
+        // Rotation đúng cho vintage camera GLB trong first-person view:
+        //   -90 trên X: đứng thẳng (Blender Z-up → Unity Y-up)
+        //    90 trên Y: ống kính chỉ về phía trước cùng hướng player nhìn
+        private static readonly Quaternion CameraModelRotation = Quaternion.Euler(-90f, 90f, 0f);
+
+        /// <summary>
+        /// Gắn model máy ảnh cổ thay thế Cube placeholder, hoặc fix rotation nếu GLB đã tồn tại.
+        /// KHÔNG Destroy CameraHandModel — giữ reference cho Phase1Manager.
+        /// </summary>
+        private void SwapCameraHandModel()
+        {
+            if (_cameraModelSwapped) return;
+
+            Camera mainCam = Camera.main;
+            if (mainCam == null) return;
+
+            // Tìm CameraHandModel trong children của Main Camera (kể cả inactive)
+            Transform found = mainCam.transform.Find("CameraHandModel");
+            if (found == null)
+            {
+                GameObject go = GameObject.Find("CameraHandModel");
+                if (go != null) found = go.transform;
+            }
+            if (found == null) return;
+
+            // --- CASE 1: Đã có child "VintageCameraModel" → chỉ cần fix rotation ---
+            Transform existingVintage = found.Find("VintageCameraModel");
+            if (existingVintage != null)
+            {
+                existingVintage.localRotation = CameraModelRotation;
+                _cameraModelSwapped = true;
+                return;
+            }
+
+            // --- CASE 2: CameraHandModel là GLB model từ setup (có children, không phải Cube) ---
+            // Nhận dạng: childCount > 0 nhưng không có Cube MeshFilter
+            bool isCubePlaceholder = found.GetComponent<MeshFilter>() != null;
+            if (!isCubePlaceholder && found.childCount > 0)
+            {
+                // Đây là GLB model từ CreateCameraHandModel() — chỉ fix rotation của chính nó
+                found.localRotation = CameraModelRotation;
+                _cameraModelSwapped = true;
+                Debug.Log("[PhotoCamera] Fixed rotation của GLB model từ setup.");
+                return;
+            }
+
+            // --- CASE 3: Cube placeholder cũ — ẩn mesh + thêm GLB làm child ---
+            GameObject cameraPrefab = Resources.Load<GameObject>("Models/VintageCamera");
+            if (cameraPrefab == null)
+            {
+                Debug.LogWarning("[PhotoCamera] Không load được Models/VintageCamera từ Resources.");
+                return;
+            }
+
+            // Ẩn Cube gốc (giữ nguyên GameObject để Phase1Manager reference vẫn hợp lệ)
+            var mr = found.GetComponent<MeshRenderer>();
+            if (mr != null) mr.enabled = false;
+            var bc = found.GetComponent<BoxCollider>();
+            if (bc != null) bc.enabled = false;
+
+            // Thêm GLB làm child — kế thừa scale + position từ parent Cube
+            GameObject vintageModel = Instantiate(cameraPrefab, found);
+            vintageModel.name = "VintageCameraModel";
+            vintageModel.transform.localPosition = Vector3.zero;
+            vintageModel.transform.localRotation = CameraModelRotation;
+            vintageModel.transform.localScale = Vector3.one;
+
+            foreach (var col in vintageModel.GetComponentsInChildren<Collider>())
+                Destroy(col);
+
+            _cameraModelSwapped = true;
+            Debug.Log("[PhotoCamera] Đã gắn VintageCameraModel vào CameraHandModel Cube.");
         }
 
         private void OnDestroy()
@@ -119,7 +204,11 @@ namespace RungTramTraSu
             {
                 CameraManager.Instance.UnlockCamera();
             }
+            // Phase1Manager sẽ tự gọi cameraHandModel.SetActive(true) sau đó
+            // SwapCameraHandModel đã chạy lúc scene start và ẩn MeshRenderer của Cube
+            // → model VintageCameraModel (child) sẽ hiển thị cùng với parent
         }
+
 
         public void SetCaptureEnabled(bool enabled)
         {
