@@ -321,6 +321,8 @@ namespace RungTramTraSu
             GameObject gameUI = GameObject.Find("GameUI");
             if (gameUI != null) gameUI.SetActive(false);
 
+            if (EndingDiaryController.Instance != null && diaryCanvas != null)
+            {
                 // Populate photos
                 if (polaroidImages != null)
                 {
@@ -347,7 +349,6 @@ namespace RungTramTraSu
                 RectTransform bgRect = diaryText != null ? diaryText.transform.parent.GetComponent<RectTransform>() : null;
                 EndingDiaryController.Instance.StartEndingSequence(diaryCanvas, bgRect, diaryText, polaroidImages, replayButton);
             }
-
             else
             {
                 // Fallback nếu không có diaryCanvas hoặc EndingDiaryController
@@ -357,6 +358,7 @@ namespace RungTramTraSu
                 yield return new WaitForSeconds(5f);
                 SceneManager.LoadScene("Phase1_GrandpaHouse");
             }
+
         }
 
 
